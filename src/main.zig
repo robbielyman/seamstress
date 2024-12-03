@@ -6,7 +6,9 @@ pub fn main() !void {
     log_writer = bw.writer().any();
 
     // allocation
-    var gpa: if (builtin.mode == .Debug) std.heap.GeneralPurposeAllocator(.{}) else void = if (builtin.mode == .Debug) .{};
+    var gpa: if (builtin.mode == .Debug) std.heap.GeneralPurposeAllocator(.{
+        .stack_trace_frames = 20,
+    }) else void = if (builtin.mode == .Debug) .{};
     defer if (builtin.mode == .Debug) {
         if (gpa.deinit() == .leak) {
             std.debug.print("leaked memory!\n", .{});
@@ -52,7 +54,7 @@ pub fn main() !void {
     if (builtin.mode == .Debug) try std.posix.sigaction(std.posix.SIG.ABRT, &act, null);
 
     const l = try Lua.init(&allocator);
-    defer l.deinit();
+    defer l.close();
 
     panic_closure = .{
         .ctx = l,

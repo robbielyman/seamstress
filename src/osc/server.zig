@@ -273,6 +273,7 @@ fn send(l: *Lua) i32 {
     };
     // get the bytes
     const msg = message.commit(lu.allocator(l), path) catch l.raiseErrorStr("out of memory!", .{});
+    defer if (l.typeOf(3) == .table) message.deinit();
     defer msg.unref();
     // send it!
     server.sendOSCBytes(addr, msg.toBytes()) catch |err| {

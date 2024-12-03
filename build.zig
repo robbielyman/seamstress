@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) !void {
     });
     addImports(b, &lib.root_module, target, optimize);
     const lib_install = b.addInstallFileWithDir(lib.getEmittedBin(), .lib, "seamstress.so");
+    lib_install.step.dependOn(&lib.step);
     b.getInstallStep().dependOn(&lib_install.step);
 
     const exe = b.addExecutable(.{

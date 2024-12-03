@@ -166,6 +166,8 @@ fn bytes(l: *Lua) i32 {
 fn new(l: *Lua) i32 {
     const arg_exists = l.getTop() != 0;
     const builder = l.newUserdata(z.Message.Builder, 1); // create a builder
+    _ = l.getMetatableRegistry("seamstress.osc.Message"); // set the metatable
+    l.setMetatable(-2);
     builder.* = z.Message.Builder.init(lu.allocator(l)); // initialize
     if (arg_exists) {
         // set path
@@ -214,9 +216,7 @@ fn new(l: *Lua) i32 {
         l.pushNil();
         l.setUserValue(-2, 1) catch unreachable;
     }
-    _ = l.getMetatableRegistry("seamstress.osc.Message"); // set the metatable
-    l.setMetatable(-2); // and return it
-    return 1;
+    return 1; // and return it
 }
 
 /// appends the item at the top of the stack to the given builder
