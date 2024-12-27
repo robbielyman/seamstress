@@ -26,16 +26,16 @@ pub fn main() !void {
     }
 
     // environment variables
-    const environ = try setEnvironmentVariables(allocator);
-    const old_environ = std.c.environ;
-    std.c.environ = environ.ptr;
-    defer {
+    const environ = if (builtin.os.tag != .windows) try setEnvironmentVariables(allocator);
+    const old_environ = if (builtin.os.tag != .windows) std.c.environ;
+    if (builtin.os.tag != .windows) std.c.environ = environ.ptr;
+    defer if (builtin.os.tag != .windows) {
         freeEnviron(allocator, environ);
         std.c.environ = old_environ;
-    }
+    };
 
     // handle SIGABRT (called by lua in Debug mode)
-    const act: if (builtin.mode == .Debug) std.posix.Sigaction = if (builtin.mode == .Debug) .{
+    const act: if (builtin.mode == .Debug) std.posix.Sigaction else void = if (builtin.mode == .Debug) .{
         .handler = .{
             .handler = struct {
                 fn handleAbrt(_: c_int) callconv(.C) noreturn {

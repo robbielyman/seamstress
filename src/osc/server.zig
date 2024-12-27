@@ -33,7 +33,10 @@ const Server = @This();
 c: xev.Completion = .{},
 c_c: xev.Completion = .{},
 udp: xev.UDP,
-state: xev.UDP.State = .{
+state: xev.UDP.State = if (xev.backend == .io_uring) .{
+    .userdata = null,
+    .op = undefined,
+} else .{
     .userdata = null,
 },
 addr: std.net.Address,
@@ -205,7 +208,7 @@ fn new(l: *Lua) i32 {
         .socket = std.posix.socket(server.addr.any.family, std.posix.SOCK.DGRAM, 0) catch l.raiseErrorStr("unable to open UDP socket for sending!", .{}),
     };
 
-    std.posix.setsockopt(server.socket, std.posix.SOL.SOCKET, std.posix.SO.REUSEPORT, &std.mem.toBytes(@as(c_int, 1))) catch
+    std.posix.setsockopt(server.socket, std.posix.SOL.SOCKET, if (builtin.os.tag == .windows) std.posix.SO.REUSE_MULTICASTPORT else std.posix.SO.REUSEPORT, &std.mem.toBytes(@as(c_int, 1))) catch
         l.raiseErrorStr("unable to set socket option: reuse port", .{});
     std.posix.setsockopt(server.socket, std.posix.SOL.SOCKET, std.posix.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1))) catch
         l.raiseErrorStr("unable to set socket option: reuse addr", .{});
@@ -273,7 +276,7 @@ fn send(l: *Lua) i32 {
     };
     // get the bytes
     const msg = message.commit(lu.allocator(l), path) catch l.raiseErrorStr("out of memory!", .{});
-    defer if (l.typeOf(3) == .table) message.deinit();
+    // defer if (l.typeOf(3) == .table) message.deinit();
     defer msg.unref();
     // send it!
     server.sendOSCBytes(addr, msg.toBytes()) catch |err| {

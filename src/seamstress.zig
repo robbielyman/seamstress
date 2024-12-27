@@ -91,10 +91,17 @@ pub fn main(l: *Lua) !void {
     lu.load(l, "seamstress");
     const seamstress = l.toUserdata(Seamstress, -1) catch unreachable;
     l.setGlobal("seamstress");
-    lu.load(l, "seamstress.repl");
-    l.pop(1);
-    lu.load(l, "seamstress.cli");
-    l.pop(1);
+    blk: {
+        const args = std.process.argsAlloc(l.allocator()) catch break :blk;
+        defer std.process.argsFree(l.allocator(), args);
+        if (args.len >= 2)
+            if (std.mem.eql(u8, "test", args[1]))
+                break :blk;
+        lu.load(l, "seamstress.repl");
+        l.pop(1);
+        lu.load(l, "seamstress.cli");
+        l.pop(1);
+    }
     var c: xev.Completion = .{};
     seamstress.loop.timer(&c, 0, seamstress, struct {
         fn f(ud: ?*anyopaque, _: *xev.Loop, _: *xev.Completion, r: xev.Result) xev.CallbackAction {

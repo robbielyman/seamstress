@@ -113,6 +113,7 @@ fn __eq(l: *Lua) i32 {
 fn __gc(l: *Lua) i32 {
     const builder = l.checkUserdata(z.Message.Builder, 1, "seamstress.osc.Message");
     builder.deinit(); // release the ArrayList
+    builder.* = undefined;
     return 0;
 }
 

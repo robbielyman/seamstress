@@ -63,7 +63,9 @@ pub fn parseAddress(l: *Lua, index: i32) !std.net.Address {
         },
         .string => parse: {
             const path = l.toString(index) catch unreachable;
-            break :parse std.net.Address.initUnix(path);
+            const colon = std.mem.indexOfScalar(u8, path, ':') orelse return error.IpStringMissingColon;
+            const port = try std.fmt.parseInt(u16, path[colon + 1 ..], 10);
+            break :parse try std.net.Address.parseIp(path[0..colon], port);
         },
         .table => table: {
             switch (l.getIndex(index, 1)) {
