@@ -1,0 +1,22 @@
+name: release
+on:
+  push:
+    tags:
+      - '*'
+    workflow_dispatch:
+  jobs:
+    release:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - uses: mlugg/setup-zig@v1
+          with:
+            version: 0.13.0
+        - run: zig build release
+        - name: zip artifact
+          run: |
+            cd zig-out/ && for i in *; do tar -czf ../$i.tar.gz $i; done
+        - uses: actions/upload-artifact@v4
+          with:
+            path: |
+              *.tar.gz
