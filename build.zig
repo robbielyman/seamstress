@@ -11,15 +11,8 @@ const Dep = struct {
 };
 
 const Options = struct {
-    sys: Sys,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-
-    const Sys = struct {
-        lua: ?[]const u8,
-
-        const release: Sys = .{ .lua = null };
-    };
 };
 
 fn extensionlessBasename(path: []const u8) []const u8 {
@@ -31,42 +24,10 @@ fn extensionlessBasename(path: []const u8) []const u8 {
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    const lua_dir = b.option([]const u8, "lua-dir", "directory containing the system Lua library");
-
-    const assets = b.createModule(.{
-        .root_source_file = b.addWriteFile("module.zig",
-            \\pub const lua = @import("lua");
-            \\pub const @"test" = @import("test");
-            \\
-        ).files.items[0].getPath(),
-    });
-    {
-        const lua_files: []const []const u8 = &.{
-            "lua/core/test.lua",
-            "lua/core/event.lua",
-        };
-        const ef = e.addEmbedFiles(b);
-        for (lua_files) |file| ef.addFile(b.path(file), extensionlessBasename(file), null);
-        assets.addImport("lua", ef.module);
-    }
-    {
-        const lua_test_files: []const []const u8 = &.{
-            "lua/test/monome_spec.lua",
-            "lua/test/async_spec.lua",
-            "lua/test/timer_spec.lua",
-            "lua/test/osc_spec.lua",
-        };
-        const ef = e.addEmbedFiles(b);
-        for (lua_test_files) |file| ef.addFile(b.path(file), extensionlessBasename(file), null);
-        assets.addImport("test", ef.module);
-    }
 
     const deps = createImports(b, .{
         .target = target,
         .optimize = optimize,
-        .sys = .{
-            .lua = lua_dir,
-        },
     });
 
     const lib = b.addSharedLibrary(.{
@@ -77,7 +38,6 @@ pub fn build(b: *std.Build) !void {
         .link_libc = true,
     });
     for (deps) |dep| dep.addImport(&lib.root_module);
-    lib.root_module.addImport("assets", assets);
     const lib_install = b.addInstallFileWithDir(
         lib.getEmittedBin(),
         .lib,
@@ -94,7 +54,6 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
     for (deps) |dep| dep.addImport(&exe.root_module);
-    exe.root_module.addImport("assets", assets);
     b.installArtifact(exe);
 
     const tests = b.addTest(.{
@@ -103,7 +62,6 @@ pub fn build(b: *std.Build) !void {
         .root_source_file = b.path("src/main.zig"),
     });
     for (deps) |dep| dep.addImport(&tests.root_module);
-    tests.root_module.addImport("assets", assets);
     const tests_run = b.addRunArtifact(tests);
 
     const tests_step = b.step("test", "test seamstress");
@@ -131,8 +89,6 @@ pub fn build(b: *std.Build) !void {
         dep.addImport(&root_comp_check.root_module);
         dep.addImport(&comp_check.root_module);
     }
-    root_comp_check.root_module.addImport("assets", assets);
-    comp_check.root_module.addImport("assets", assets);
     const check = b.step("check", "check for compile errors");
     check.dependOn(&comp_check.step);
     check.dependOn(&root_comp_check.step);
@@ -156,12 +112,10 @@ pub fn build(b: *std.Build) !void {
             .link_libc = true,
         });
         const target_deps = createImports(b, .{
-            .sys = Options.Sys.release,
             .target = t,
             .optimize = .ReleaseFast,
         });
         for (target_deps) |dep| dep.addImport(&release_exe.root_module);
-        release_exe.root_module.addImport("assets", assets);
 
         const target_output = b.addInstallArtifact(release_exe, .{
             .dest_dir = .{ .override = .{
@@ -178,6 +132,56 @@ pub fn build(b: *std.Build) !void {
 fn createImports(b: *std.Build, options: Options) []const Dep {
     var list: std.ArrayListUnmanaged(Dep) = .{};
     list.ensureTotalCapacity(b.allocator, 5) catch @panic("OOM");
+
+    const assets = b.createModule(.{
+        .root_source_file = b.addWriteFile("module.zig",
+            \\pub const lua = @import("lua");
+            \\pub const @"test" = @import("test");
+            \\pub const version = @import("version").version;
+            \\
+        ).files.items[0].getPath(),
+    });
+    {
+        const lua_files: []const []const u8 = &.{
+            "lua/core/test.lua",
+            "lua/core/event.lua",
+        };
+        const ef = e.addEmbedFiles(b);
+        for (lua_files) |file| ef.addFile(b.path(file), extensionlessBasename(file), null);
+        assets.addImport("lua", ef.module);
+    }
+    {
+        const lua_test_files: []const []const u8 = &.{
+            "lua/test/monome_spec.lua",
+            "lua/test/async_spec.lua",
+            "lua/test/timer_spec.lua",
+            "lua/test/osc_spec.lua",
+        };
+        const ef = e.addEmbedFiles(b);
+        for (lua_test_files) |file| ef.addFile(b.path(file), extensionlessBasename(file), null);
+        assets.addImport("test", ef.module);
+    }
+    {
+        const ef = e.addEmbedFiles(b);
+        ef.addFile(b.path("version.txt"), "semver-str", null);
+        const wf_module = b.addWriteFile("version.zig",
+            \\const semver_str = str: {
+            \\    const str = @import("semver-str").@"semver-str";
+            \\    if (std.mem.indexOfAny(u8, &str, "\r\n \t")) |idx| break :str str[0..idx];
+            \\    break :str &str;
+            \\};
+            \\const std = @import("std");
+            \\
+            \\pub const version = std.SemanticVersion.parse(semver_str) catch |err| {
+            \\    @compileLog("string: ", semver_str);
+            \\    @compileLog("error: ", err);
+            \\    @compileError("semantic version string failed to parse!");
+            \\};
+        ).files.items[0].getPath();
+        const version = b.createModule(.{ .root_source_file = wf_module });
+        version.addImport("semver-str", ef.module);
+        assets.addImport("version", version);
+    }
 
     const ziglua = b.dependency("ziglua", .{
         .target = options.target,
@@ -196,6 +200,7 @@ fn createImports(b: *std.Build, options: Options) []const Dep {
     list.appendAssumeCapacity(.{ .module = xev.module("xev"), .name = "xev" });
     list.appendAssumeCapacity(.{ .module = zosc.module("zosc"), .name = "zosc" });
     list.appendAssumeCapacity(.{ .module = @"known-folders".module("known-folders"), .name = "known-folders" });
+    list.appendAssumeCapacity(.{ .module = assets, .name = "assets" });
 
     return list.items;
 }

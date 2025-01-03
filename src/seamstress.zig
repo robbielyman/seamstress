@@ -313,13 +313,7 @@ pub fn panicCleanup(l: *Lua) void {
     };
 }
 
-pub const version: std.SemanticVersion = .{
-    .major = 2,
-    .minor = 0,
-    .patch = 0,
-    .pre = "prealpha",
-    .build = "241129",
-};
+pub const version = @import("assets").version;
 
 const xev = @import("xev");
 const ziglua = @import("ziglua");
