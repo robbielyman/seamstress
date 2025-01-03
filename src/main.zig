@@ -54,7 +54,8 @@ pub fn main() !void {
     };
 
     // handle SIGABRT (called by lua in Debug mode)
-    const act: if (builtin.mode == .Debug) std.posix.Sigaction else void = if (builtin.mode == .Debug) .{
+    const using_sigaction = builtin.mode == .Debug and builtin.os.tag != .windows;
+    const act: if (using_sigaction) std.posix.Sigaction else void = if (using_sigaction) .{
         .handler = .{
             .handler = struct {
                 fn handleAbrt(_: c_int) callconv(.C) noreturn {
@@ -70,7 +71,7 @@ pub fn main() !void {
         .mask = if (builtin.os.tag == .linux) std.posix.empty_sigset else 0,
         .flags = 0,
     };
-    if (builtin.mode == .Debug) try std.posix.sigaction(std.posix.SIG.ABRT, &act, null);
+    if (using_sigaction) try std.posix.sigaction(std.posix.SIG.ABRT, &act, null);
 
     const l = try Lua.init(&allocator);
     defer l.close();
