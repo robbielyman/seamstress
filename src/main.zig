@@ -126,19 +126,19 @@ fn setEnvironmentVariables(allocator: std.mem.Allocator) !EnvBlockType {
             try map.put(key, value);
         }
     }
-    if (map.get("SEAMSTRESS_HOME") == null) {
-        const home = map.get("HOME") orelse {
-            std.debug.print(
-                \\$HOME and $SEAMSTRESS_HOME undefined!
-                \\define $SEAMSTRESS_HOME and try again
-                \\
-            , .{});
-            std.process.exit(1);
-        };
-        const seamstress_home = try std.fs.path.join(allocator, &.{ home, "seamstress" });
-        defer allocator.free(seamstress_home);
-        try map.put("SEAMSTRESS_HOME", seamstress_home);
-    }
+    // if (map.get("SEAMSTRESS_HOME") == null) {
+    // const home = map.get("HOME") orelse {
+    // std.debug.print(
+    // \\$HOME and $SEAMSTRESS_HOME undefined!
+    // \\define $SEAMSTRESS_HOME and try again
+    // \\
+    // , .{});
+    // std.process.exit(1);
+    // };
+    // const seamstress_home = try std.fs.path.join(allocator, &.{ home, "seamstress" });
+    // defer allocator.free(seamstress_home);
+    // try map.put("SEAMSTRESS_HOME", seamstress_home);
+    // }
     return switch (builtin.os.tag) {
         .windows => try std.process.createWindowsEnvBlock(allocator, &map),
         .macos, .linux => try std.process.createEnvironFromMap(allocator, &map, .{}),
