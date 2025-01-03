@@ -106,11 +106,8 @@ pub fn build(b: *std.Build) !void {
     tests.root_module.addImport("assets", assets);
     const tests_run = b.addRunArtifact(tests);
 
-    const run_lua_tests = b.addRunArtifact(exe);
-    run_lua_tests.addArg("test");
     const tests_step = b.step("test", "test seamstress");
     tests_step.dependOn(&tests_run.step);
-    tests_step.dependOn(&run_lua_tests.step);
 
     const run = b.addRunArtifact(exe);
     run.step.dependOn(b.getInstallStep());

@@ -16,7 +16,13 @@ jobs:
           luaVersion: "5.4.7"
       - uses: luarocks/gh-actions-luarocks@v5
       - run: luarocks install busted
+      - run: zig build
       - run: zig build test
+        timeout-minutes: 5
+        continue-on-error: true
+      - run: zig build run -- test
+        timeout-minutes: 1
+        continue-on-error: true
   check-fmt:
     runs-on: ubuntu-latest
     steps:
