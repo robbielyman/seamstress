@@ -26,12 +26,31 @@ pub fn main() !void {
     }
 
     // environment variables
-    const environ = if (builtin.os.tag != .windows) try setEnvironmentVariables(allocator);
-    const old_environ = if (builtin.os.tag != .windows) std.c.environ;
-    if (builtin.os.tag != .windows) std.c.environ = environ.ptr;
-    defer if (builtin.os.tag != .windows) {
-        freeEnviron(allocator, environ);
-        std.c.environ = old_environ;
+    const environ = try setEnvironmentVariables(allocator);
+    const old_environ =
+        switch (builtin.os.tag) {
+        .windows => old: {
+            const old = std.os.windows.peb().ProcessParameters.Environment;
+            std.os.windows.peb().ProcessParameters.Environment = environ.ptr;
+            break :old old;
+        },
+        .linux, .macos => old: {
+            const old = std.c.environ;
+            std.c.environ = environ.ptr;
+            break :old old;
+        },
+        else => @compileError("os unsupported!"),
+    };
+    defer switch (builtin.os.tag) {
+        .windows => {
+            std.os.windows.peb().ProcessParameters.Environment = old_environ;
+            freeEnviron(allocator, environ);
+        },
+        .linux, .macos => {
+            std.c.environ = old_environ;
+            freeEnviron(allocator, environ);
+        },
+        else => @compileError("os unsupported!"),
     };
 
     // handle SIGABRT (called by lua in Debug mode)
@@ -68,8 +87,14 @@ pub fn main() !void {
     std.process.cleanExit();
 }
 
+const EnvBlockType = switch (builtin.os.tag) {
+    .macos, .linux => [:null]?[*:0]u8,
+    .windows => []u16,
+    else => @compileError("os unsupported!"),
+};
+
 /// normalizes environment variables that seamstress uses
-fn setEnvironmentVariables(allocator: std.mem.Allocator) ![:null]?[*:0]u8 {
+fn setEnvironmentVariables(allocator: std.mem.Allocator) !EnvBlockType {
     var map = try std.process.getEnvMap(allocator);
     defer map.deinit();
     luarocks: {
@@ -93,24 +118,6 @@ fn setEnvironmentVariables(allocator: std.mem.Allocator) ![:null]?[*:0]u8 {
             try map.put(key, value);
         }
     }
-    if (map.get("SEAMSTRESS_LUA_PATH") == null) {
-        const location = try std.fs.selfExeDirPathAlloc(allocator);
-        defer allocator.free(location);
-        const path = try std.fs.path.join(allocator, &.{ location, "..", "share", "seamstress", "lua" });
-        defer allocator.free(path);
-        const real_path = std.fs.realpathAlloc(allocator, path) catch |err| {
-            if (err == error.FileNotFound) {
-                std.debug.print(
-                    \\unable to normalize given path: "{s}"
-                    \\define $SEAMSTRESS_LUA_PATH to overwrite and try again
-                    \\
-                , .{path});
-                std.process.exit(1);
-            } else return err;
-        };
-        defer allocator.free(real_path);
-        try map.put("SEAMSTRESS_LUA_PATH", real_path);
-    }
     if (map.get("SEAMSTRESS_HOME") == null) {
         const home = map.get("HOME") orelse {
             std.debug.print(
@@ -124,19 +131,26 @@ fn setEnvironmentVariables(allocator: std.mem.Allocator) ![:null]?[*:0]u8 {
         defer allocator.free(seamstress_home);
         try map.put("SEAMSTRESS_HOME", seamstress_home);
     }
-    if (map.get("SEAMSTRESS_CONFIG_FILENAME") == null) {
-        try map.put("SEAMSTRESS_CONFIG_FILENAME", "config.lua");
-    }
-    return try std.process.createEnvironFromMap(allocator, &map, .{});
+    return switch (builtin.os.tag) {
+        .windows => try std.process.createWindowsEnvBlock(allocator, &map),
+        .macos, .linux => try std.process.createEnvironFromMap(allocator, &map, .{}),
+        else => comptime unreachable,
+    };
 }
 
 /// frees memory
-fn freeEnviron(allocator: std.mem.Allocator, environ: [:null]?[*:0]u8) void {
-    for (environ) |variable| {
-        const slice = std.mem.sliceTo(variable orelse continue, 0);
-        allocator.free(slice);
+fn freeEnviron(allocator: std.mem.Allocator, environ: EnvBlockType) void {
+    switch (builtin.os.tag) {
+        .macos, .linux => {
+            for (environ) |variable| {
+                const slice = std.mem.sliceTo(variable orelse continue, 0);
+                allocator.free(slice);
+            }
+            allocator.free(environ);
+        },
+        .windows => allocator.free(environ),
+        else => comptime unreachable,
     }
-    allocator.free(environ);
 }
 
 /// if we get an agrument starting with -h, --h, -v or --v, print usage and exit

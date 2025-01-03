@@ -347,7 +347,8 @@ test "lifecycle" {
             _ = r.timer catch unreachable;
             const boolean: *bool = @ptrCast(@alignCast(ud.?));
             const lua = lu.getLua(loop);
-            for (modules.list.values()) |@"fn"| {
+            for (modules.list.keys(), modules.list.values()) |key, @"fn"| {
+                std.debug.print("{s}\n", .{key});
                 lua.pushFunction(@"fn");
                 lu.doCall(lua, 0, 0) catch {
                     std.debug.print("{s}\n", .{lua.toString(-1) catch unreachable});

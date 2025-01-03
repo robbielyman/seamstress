@@ -5,9 +5,10 @@ pub fn register(l: *Lua) i32 {
 
 fn repl(l: *Lua) i32 {
     const input = l.checkString(1);
-    const top = l.getTop();
     return switch (processChunk(l, input) catch l.raiseError()) {
-        .ok => l.getTop() - top,
+        // the item on top of the stack is either an error string indicating the passed-in function is incomplete
+        // or a compiled lua function that accepts zero arguments and returns a variable number of things
+        .ok => 1,
         .incomplete => 1,
     };
 }
@@ -42,13 +43,11 @@ fn processChunk(l: *Lua, buffer: []const u8) !enum { ok, incomplete } {
                 };
             },
         }
-        // call the compiled function
-        try lu.doCall(l, 0, ziglua.mult_return);
+        // leave the compiled function on top of the stack
         return .ok;
     };
     // ... the chunk compiles fine with "return " added!
-    // call the compiled function
-    try lu.doCall(l, 0, ziglua.mult_return);
+    // leave the compiled function on top of the stack
     return .ok;
 }
 

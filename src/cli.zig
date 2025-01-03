@@ -38,105 +38,170 @@ fn setup(lua: *Lua) !void {
     if (!builtin.is_test) try std.io.getStdOut().writeAll("> ");
     self.stdin.read(&seamstress.loop, &self.c, .{
         .slice = self.buffer.unusedCapacitySlice(),
-    }, anyopaque, lu.ptrFromHandle(h), struct {
-        fn stdinCallback(
-            ptr: ?*anyopaque,
-            loop: *xev.Loop,
-            c: *xev.Completion,
-            _: Stdin,
-            _: xev.ReadBuffer,
-            r: xev.ReadError!usize,
-        ) xev.CallbackAction {
-            const l = lu.getLua(loop);
-            const handle = lu.handleFromPtr(ptr);
-            _ = l.rawGetIndex(ziglua.registry_index, handle);
-            const cli = l.toUserdata(Cli, -1) catch unreachable;
+    }, anyopaque, lu.ptrFromHandle(h), stdinCallback);
+}
 
-            const length = r catch |err| {
-                const str = @errorName(err);
-                l.unref(ziglua.registry_index, handle);
-                cli.running = false;
-                if (err != error.Canceled and err != error.EOF)
-                    logger.err("error reading from stdin! {s}", .{str});
-                if (err == error.EOF) {
-                    lu.load(l, "seamstress");
-                    _ = l.getField(-1, "stop");
-                    l.rotate(-2, 1);
-                    lu.doCall(l, 1, 0) catch {
-                        lu.reportError(l);
-                    };
-                }
-                return .disarm;
+fn loggingOnErrWriteFn(comptime Writer: type) fn (Writer, []const u8) anyerror!usize {
+    return struct {
+        fn write(writer: Writer, bytes: []const u8) anyerror!usize {
+            return writer.write(bytes) catch |err| {
+                logger.err("unable to write to stdout: {s}", .{@errorName(err)});
+                return err;
             };
-            l.pop(1);
+        }
+    }.write;
+}
 
-            cli.buffer.items.len += length;
-            if (std.mem.eql(u8, "quit\n", cli.buffer.items)) {
-                l.unref(ziglua.registry_index, handle);
-                cli.running = false;
-                lu.load(l, "seamstress");
-                _ = l.getField(-1, "stop");
-                l.rotate(-2, 1);
-                lu.doCall(l, 1, 0) catch {
-                    lu.reportError(l);
-                };
-                return .disarm;
-            }
-            var keep_going = true;
-            defer if (!keep_going) {
-                l.unref(ziglua.registry_index, handle);
-                cli.running = false;
-            };
-            var buf = std.io.bufferedWriter(if (!builtin.is_test)
-                std.io.getStdOut().writer()
-            else
-                std.io.null_writer);
-            const stdout = buf.writer();
-            lu.load(l, "seamstress.repl");
-            _ = l.pushString(cli.buffer.items);
-            lu.doCall(l, 1, ziglua.mult_return) catch {
+fn LoggingOnErrWriter(comptime Writer: type) type {
+    return std.io.GenericWriter(Writer, anyerror, loggingOnErrWriteFn(Writer));
+}
+
+fn loggingOnErrWriter(writer: anytype) LoggingOnErrWriter(@TypeOf(writer)) {
+    return .{ .context = writer };
+}
+
+fn stdinCallback(
+    ptr: ?*anyopaque,
+    loop: *xev.Loop,
+    c: *xev.Completion,
+    _: Stdin,
+    _: xev.ReadBuffer,
+    r: xev.ReadError!usize,
+) xev.CallbackAction {
+    const l = lu.getLua(loop);
+    const handle = lu.handleFromPtr(ptr);
+    _ = l.rawGetIndex(ziglua.registry_index, handle);
+    const cli = l.toUserdata(Cli, -1) catch unreachable;
+
+    const length = r catch |err| {
+        const str = @errorName(err);
+        l.pop(1);
+        l.unref(ziglua.registry_index, handle);
+        cli.running = false;
+        if (err != error.Canceled and err != error.EOF)
+            logger.err("error reading from stdin! {s}", .{str});
+        if (err == error.EOF) {
+            lu.load(l, "seamstress");
+            _ = l.getField(-1, "stop");
+            l.rotate(-2, 1);
+            lu.doCall(l, 1, 0) catch {
                 lu.reportError(l);
-                cli.buffer.clearRetainingCapacity();
-                cli.buffer.ensureUnusedCapacity(lu.allocator(l), max_input_len) catch
-                    logger.warn("out of memory; unable to grow input buffer!", .{});
-                cli.stdin.read(loop, c, .{
-                    .slice = cli.buffer.unusedCapacitySlice(),
-                }, anyopaque, ptr, @This().stdinCallback);
-                return .disarm;
             };
-            defer l.setTop(0);
-            if (l.getTop() > 0 and l.typeOf(-1) == .string and std.mem.endsWith(u8, l.toString(-1) catch unreachable, "<eof>")) {
-                stdout.writeAll(">... ") catch |err| {
+        }
+        return .disarm;
+    };
+    cli.buffer.items.len += length;
+
+    cli.stdinCallback2(l, loop, c, ptr) catch {
+        lu.reportError(l);
+        l.unref(ziglua.registry_index, handle);
+        cli.running = false;
+    };
+    l.pop(1);
+    return .disarm;
+}
+
+fn stdinCallback2(cli: *Cli, l: *Lua, loop: *xev.Loop, c: *xev.Completion, ptr: ?*anyopaque) !void {
+    if (std.mem.eql(u8, "quit\n", cli.buffer.items)) return {
+        const handle = lu.handleFromPtr(ptr);
+        l.unref(ziglua.registry_index, handle);
+        cli.running = false;
+        lu.load(l, "seamstress");
+        _ = l.getField(-1, "stop");
+        l.rotate(-2, 1);
+        lu.doCall(l, 1, 0) catch {
+            lu.reportError(l);
+        };
+    };
+    var buf = std.io.bufferedWriter(if (!builtin.is_test)
+        std.io.getStdOut().writer()
+    else
+        std.io.null_writer);
+    const stdout = loggingOnErrWriter(buf.writer());
+    lu.load(l, "seamstress.repl");
+    _ = l.pushString(cli.buffer.items);
+    lu.doCall(l, 1, 1) catch {
+        lu.reportError(l);
+        cli.buffer.clearRetainingCapacity();
+        cli.buffer.ensureUnusedCapacity(lu.allocator(l), max_input_len) catch
+            logger.warn("out of memory; unable to grow input buffer!", .{});
+        cli.stdin.read(loop, c, .{
+            .slice = cli.buffer.unusedCapacitySlice(),
+        }, anyopaque, ptr, @This().stdinCallback);
+    };
+    const incomplete = l.typeOf(-1) == .string and std.mem.endsWith(u8, l.toString(-1) catch unreachable, "<eof>");
+    if (incomplete) {
+        l.pop(1); // pop the error string
+        try stdout.writeAll(">...");
+        buf.flush() catch |err| {
+            logger.err("unable to write to stdout! {s}", .{@errorName(err)});
+            return err;
+        };
+        cli.buffer.ensureUnusedCapacity(lu.allocator(l), max_input_len) catch
+            logger.warn("out of memory; unable to grow input buffer!", .{});
+        cli.stdin.read(loop, c, .{
+            .slice = cli.buffer.unusedCapacitySlice(),
+        }, anyopaque, ptr, @This().stdinCallback);
+        return;
+    }
+    // complete; let's call it
+    l.pushInteger(lu.handleFromPtr(ptr)); // stack is now: cli repl_func handle
+    l.pushValue(-1);
+    l.pushClosure(ziglua.wrap(resumeRepl(.success)), 1);
+    l.pushValue(-2);
+    l.pushClosure(ziglua.wrap(resumeRepl(.failure)), 1);
+    l.remove(-3);
+    try lu.waitForLuaCall(l, 0);
+    l.pop(1); // pop the promise
+}
+
+fn resumeRepl(comptime which: enum { success, failure }) fn (*Lua) i32 {
+    return struct {
+        fn f(l: *Lua) i32 {
+            const idx = Lua.upvalueIndex(1);
+            const handle = l.toInteger(idx) catch unreachable;
+            _ = l.getIndex(ziglua.registry_index, handle); // use the handle
+            const cli = l.toUserdata(Cli, -1) catch unreachable;
+            l.pop(1); // pop the cli
+            switch (which) {
+                .success => resumeRepl2(l) catch |err| {
+                    l.unref(ziglua.registry_index, @intCast(handle));
                     logger.err("unable to write to stdout! {s}", .{@errorName(err)});
-                    keep_going = false;
-                    return .disarm;
-                };
-            } else { // complete; let's print
-                cli.buffer.clearRetainingCapacity();
-                printAll(l, stdout) catch |err| {
-                    logger.err("unable to write to stdout! {s}", .{@errorName(err)});
-                    keep_going = false;
-                    return .disarm;
-                };
-                stdout.writeAll("> ") catch |err| {
-                    logger.err("unable to write to stdout! {s}", .{@errorName(err)});
-                    keep_going = false;
-                    return .disarm;
-                };
+                    return 0;
+                },
+                .failure => {
+                    lu.reportError(l);
+                    std.io.getStdOut().writer().writeAll("> ") catch |err| {
+                        logger.err("unable to write to stdout! {s}", .{@errorName(err)});
+                        return 0;
+                    };
+                },
             }
-            buf.flush() catch |err| {
-                logger.err("unable to write to stdout! {s}", .{@errorName(err)});
-                keep_going = false;
-                return .disarm;
-            };
+            const s = lu.getSeamstress(l);
+            cli.buffer.clearRetainingCapacity();
             cli.buffer.ensureUnusedCapacity(lu.allocator(l), max_input_len) catch
                 logger.warn("out of memory; unable to grow input buffer!", .{});
-            cli.stdin.read(loop, c, .{
+
+            cli.stdin.read(&s.loop, &cli.c, .{
                 .slice = cli.buffer.unusedCapacitySlice(),
-            }, anyopaque, ptr, @This().stdinCallback);
-            return .disarm;
+            }, anyopaque, lu.ptrFromHandle(@intCast(handle)), stdinCallback);
+            return 0;
         }
-    }.stdinCallback);
+    }.f;
+}
+
+fn resumeRepl2(l: *Lua) !void {
+    var buf = std.io.bufferedWriter(if (!builtin.is_test)
+        std.io.getStdOut().writer()
+    else
+        std.io.null_writer);
+    const stdout = loggingOnErrWriter(buf.writer());
+    try printAll(l, stdout);
+    try stdout.writeAll("> ");
+    buf.flush() catch |err| {
+        logger.err("unable to write to stdout! {s}", .{@errorName(err)});
+        return err;
+    };
 }
 
 fn printAll(l: *Lua, stdout: anytype) !void {

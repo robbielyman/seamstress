@@ -4,15 +4,16 @@ local seamstress = require 'seamstress'
 local function addAssertions()
   local say = require 'say'
   local assert = require 'luassert'
-    local function is_callable(_, arguments)
-        if type(arguments[1]) == 'function' then return true end
-        if type(arguments[1]) ~= 'table' and type(arguments[1]) ~= 'userdata' then return false end
-        return getmetatable(arguments[1]).__call ~= nil
-    end
+  local function is_callable(_, arguments)
+    if type(arguments[1]) == 'function' then return true end
+    if type(arguments[1]) ~= 'table' and type(arguments[1]) ~= 'userdata' then return false end
+    return getmetatable(arguments[1]).__call ~= nil
+  end
 
-    say:set("assertion.is_callable.positive", "Expected %s \nto be callable")
-    say:set("assertion.is_callable.negative", "Expected %s \nto not be callable")
-    assert:register("assertion", "is_callable", is_callable, "assertion.is_callable.positive", "assertion.is_callable.negative")
+  say:set("assertion.is_callable.positive", "Expected %s \nto be callable")
+  say:set("assertion.is_callable.negative", "Expected %s \nto not be callable")
+  assert:register("assertion", "is_callable", is_callable, "assertion.is_callable.positive",
+    "assertion.is_callable.negative")
 end
 
 local function runner()
@@ -29,9 +30,26 @@ local function runner()
 
   addAssertions()
 
-  local directory = os.getenv("SEAMSTRESS_LUA_PATH") .. package.config:sub(1, 1) .. "test"
-  local loadTestFiles = require 'busted.modules.test_file_loader' (busted, { 'lua' })
-  loadTestFiles({ directory }, { '_spec' }, { excludes = {}, verbose = true, })
+  local seamstress_lua_path = os.getenv("SEAMSTRESS_LUA_PATH")
+  if seamstress_lua_path then
+    local directory = seamstress_lua_path .. package.config:sub(1, 1) .. "test"
+    local loadTestFiles = require 'busted.modules.test_file_loader' (busted, { 'lua' })
+    loadTestFiles({ directory }, { '_spec' }, { excludes = {}, verbose = true, })
+  end
+
+  local builtin_test_files = require 'seamstress.builtin_test_files'
+  for _, tbl in ipairs(builtin_test_files) do
+    local test_file, err = load(tbl.file, tbl.filename, "t", _G)
+    if test_file then
+      local file = setmetatable({
+          getTrace = function(_, info) return info end,
+          rewriteMessage = nil,
+      }, { __call = test_file })
+      busted.executors.file(tbl.filename, file)
+    else
+      busted.publish({ 'error', 'file' }, { descriptor = 'file', name = tbl.filename }, nil, err, {})
+    end
+  end
 
   local handler = require 'busted.outputHandlers.base' ()
 
@@ -149,16 +167,21 @@ local function runner()
 
   local execute = require 'busted.execute' (busted)
   execute(1, {})
-  seamstress:stop()
 end
 
-event.addSubscriber({ 'init' }, function()
-  local ok, busted = pcall(require, 'busted')
-  if ok then
-    seamstress.async(runner)()
+local ok, busted = pcall(require, 'busted')
+if ok then
+  local ret = seamstress.async(runner)
+  event.addSubscriber({ 'init' }, function()
+    seamstress.async.Promise(function()
+      ret():await()
+      seamstress:stop()
+    end)
     return false
-  end
-  print(busted)
-  seamstress:stop()
-  return false
-end)
+  end)
+  return ret
+end
+
+return function()
+  error(busted)
+end

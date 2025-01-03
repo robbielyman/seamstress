@@ -191,6 +191,13 @@ pub fn unrefCallback(ud: ?*anyopaque, loop: *xev.Loop, _: *xev.Completion, resul
     return .disarm;
 }
 
+/// creates a closure from callback, consuming num_upvalues from the top of the stack
+/// then creates a Promise from the stack, consuming num_args + 1 from the top of the stack
+/// finally, chains that Promise with another which calls callback on success
+/// leaves the final Promise on top of the stack
+/// therefore on success the stack effect is -(num_args + num_upvalues)
+pub const waitForLuaCall = @import("async.zig").waitForLua;
+
 pub fn allocator(l: *Lua) std.mem.Allocator {
     return if (@hasDecl(@import("root"), "main"))
         l.allocator()

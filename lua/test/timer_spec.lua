@@ -18,7 +18,9 @@ describe('seamstress.Timer',
       it('can wait a few milliseconds', function()
         t.delta = 0.005
         t.running = true
+        print("waiting...")
         repeat coroutine.yield() until done
+        print("done!")
         assert(del > 0)
       end)
     end)

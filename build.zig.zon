@@ -15,5 +15,9 @@
             .url = "git+https://github.com/robbielyman/zosc?ref=v1.1.0#ef8caf3c9f86b09b7fbed9fe6d4cdba3a43fb9de",
             .hash = "12207c108f821340bc3514117afd24bace658bc3ad06b79c51d1440eb498cec4349c",
         },
+        .@"embed-file" = .{
+            .url = "git+https://github.com/robbielyman/EmbedFile.zig#b5ae28c2812a510de762b41cea489aad80bc039a",
+            .hash = "1220633202df3bfbf2436d80dee0cf94b7eeab59177b4d777680f175a08fa8deaf41",
+        },
     },
 }
