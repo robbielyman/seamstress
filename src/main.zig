@@ -38,7 +38,7 @@ pub fn main() !void {
         switch (builtin.os.tag) {
         .windows => old: {
             const old = std.os.windows.peb().ProcessParameters.Environment;
-            std.os.windows.peb().ProcessParameters.Environment = @ptrCast(environ.ptr);
+            std.os.windows.peb().ProcessParameters.Environment = environ[0 .. environ.len - 1 :0].ptr;
             break :old old;
         },
         .linux, .macos => old: {
