@@ -8,8 +8,8 @@
             .hash = "12202e945f7d80689f48333beefd8a1993f3a67ca6af400d9c746f1a121fc7cb78fa",
         },
         .libxev = .{
-            .url = "git+https://github.com/robbielyman/libxev?ref=cancel_udpsend#9fd748607d0b7295bd15e07676a0cfb954df579f",
-            .hash = "1220ff589a67de32bcce706b90d73e93b366c40bec9f0e53856d8c9ab4ddf4e32af7",
+            .url = "git+https://github.com/robbielyman/libxev?ref=seamstress-branch#8cfc85b21974996775d7ca8a4febc5d0963e6f7f",
+            .hash = "1220c9e5ef90baa4bcc9ceb73edf54961ca4de5d0bcebec6aff38a20079947b04682",
         },
         .zosc = .{
             .url = "git+https://github.com/robbielyman/zosc?ref=v1.1.0#ef8caf3c9f86b09b7fbed9fe6d4cdba3a43fb9de",

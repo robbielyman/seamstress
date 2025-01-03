@@ -1,15 +1,22 @@
 const Cli = @This();
 const max_input_len = 2 * 1024;
 
+const CliStdin = if (builtin.os.tag == .macos) Stdin else xev.File;
+
 buffer: std.ArrayListUnmanaged(u8) = .{},
 c: xev.Completion = .{},
 c_c: xev.Completion = .{},
-stdin: Stdin,
+stdin: CliStdin,
 running: bool = true,
 
 pub fn register(l: *Lua) i32 {
     const cli = l.newUserdata(Cli, 0);
-    cli.* = .{ .stdin = Stdin.init() };
+    cli.* = if (builtin.os.tag == .macos)
+        .{ .stdin = Stdin.init() }
+    else
+        .{ .stdin = xev.File.init(std.io.getStdIn()) catch |err| {
+            l.raiseErrorStr("unable to open stdin for reading! {s}", .{@errorName(err).ptr});
+        } };
     blk: {
         l.newMetatable("seamstress.cli") catch break :blk;
         const funcs: []const ziglua.FnReg = &.{
@@ -64,7 +71,7 @@ fn stdinCallback(
     ptr: ?*anyopaque,
     loop: *xev.Loop,
     c: *xev.Completion,
-    _: Stdin,
+    _: CliStdin,
     _: xev.ReadBuffer,
     r: xev.ReadError!usize,
 ) xev.CallbackAction {
