@@ -1,374 +1,43 @@
 * Seamstress
 Seamstress is an art engine.
-It provides a [[https://lua.org][Lua]] environment for users to create
+The goal is to provide a [[https://lua.org][Lua]] environment for users to create
 sequencers, music, games, visuals, etc.
 It is inspired by [[https://monome.org/docs/norns][norns]], [[https://love2d.org][Love2D]], [[https://hydra.ojack.xyz][Hydra]] and [[https://nodejs.org][Node.js]].
-Seamstress version 2 is alpha software.
+Seamstress version 2 is *alpha* software.
+
+* Usage
+
+Currently Seamstress is a very bare-bones command-line program.
+You can load a Lua file by running `seamstress FILENAME`,
+or execute Lua code from the REPL prompt.
 
 * Installation
-Seamstress version 2 may be built from source or installed via [[https://brew.sh][Homebrew]].
-To install via Homebrew,
-run the following commands.
 
-#+begin_src sh
-  brew tap robbielyman/seamstress
-  brew install seamstress --HEAD
-#+end_src
+I provide release builds of Seamstress here on GitHub.
+At the moment, Seamstress has very little in terms of external dependencies,
+so I'm optimistic that these are useful artifacts.
+Please let me know if you encounter issues with using them.
 
-** Building from source
-To build from source, you'll need the [[https://ziglang.org][Zig]] compiler, version 0.13.0.
-You can download it from the linked website,
-or install via a package manager like Homebrew.
-To compile seamstress, clone this repository
-(make sure you're on the correct branch)
+* Contributing
+
+If you're excited by the Seamstress project, I'd love to collaborate!
+Please reach out.
+
+* Building from source
+
+To build from source, you’ll need the [[https://ziglang.org][Zig]] compiler.
+Seamstress will always track releases of the Zig compiler,
+so be sure to grab the latest release, rather than the master build.
+To compile Seamstress, clone this repository
 and run =zig build= in the repository root.
+(NB: you’ll need an internet connection so that the Zig compiler can fetch dependencies.)
 
 Doing so will place the compiled executable in =./zig-out/bin=.
-You can add this folder to your =$PATH=,
+You can add this folder to your =$PATH= to make =seamstress= available from your shell,
+symlink it somewhere on your =$PATH=,
 or copy the files installed into =zig-out= somewhere in your =$PATH=.
-Now by default,
-seamstress will expect the file structure present within =zig-out=
-to be reflected wherever it is copied,
-so if you copy =seamstress= into =/usr/local/bin=,
-you should copy =share/seamstress= into =/usr/local/share/seamstress=,
-but see the section on environment variables.
 
-** Dependencies
-Aside from the Zig compiler,
-seamstress depends on a number of Zig projects,
-as well as some C libraries.
-
-*** Zig dependencies
-This section is informational;
-these dependencies are fetched by the Zig compiler
-when building seamstress from source and do not need to be installed separately.
-- [[https://github.com/mitchellh/libxev][libxev]], a cross-platform event loop inspired by =io_uring=.
-- [[https://github.com/natecraddock/ziglua][ziglua]], Zig bindings for the Lua C API.
-  Additionally, ziglua compiles and statically links against the C library =liblua=.
-
-*** C dependencies
-These dependencies must be present on your system in order to use seamstress
-and must be installed separately.
-The Homebrew formula automates this step,
-but building from source does not.
-
-*** Optional dependencies
-Although not necessary for all operations of seamstress,
-certain functionality may not work as expected if a dependency listed here is not present.
-- [[https://luarocks.org][LuaRocks]] (in particular [[https://luarocks.org/modules/lunarmodules/busted][busted]]) is required for running the Lua unit tests.
-  Additionally, the seamstress Lua environment can require LuaRocks modules.
-- [[https://github.com/LuaLS/lua-language-server][lua-language-server]] in a text editor that supports the language server protocol,
-  is not necessary for writing seamstress programs,
-  but will provide documentation, completion, etc.
-* Documentation
-Although this README will aim to be reasonably in-depth,
-it by itself does not aim to be complete documentation for seamstress.
-** Environment variables
-Seamstress pays attention to the state of the following environment variables at startup
-- =$SEAMSTRESS_LUA_PATH=, which defaults to expanding out the relative path =../share/seamstress/lua= is used to find (or override) the Lua code that seamstress ships with.
-- =$SEAMSTRESS_HOME=, which defaults to =$HOME/seamstress=, is used to find user-provided files, like the startup configuration script
-- =$SEAMSTRESS_CONFIG_FILENAME=, which defaults to =config.lua=, is the filename used to configure seamstress at startup.
-
-  Additionally, when =luarocks= is available,
-  seamstress alters for iteslf the value of the following environment variables,
-  replacing them with the output of =luarocks path=.
-  - =$LUA_PATH=
-  - =$LUA_CPATH=
-  - =$PATH=
-** Starting seamstress
-Seamstress may be invoked from the command line as =seamstress [filename]=,
-where =[filename]= is an optional argument naming the “root” Lua file of the desired script.
-If =filename= is “test”, seamstress will attempt to run a suite of unit tests
-using the =luarocks= framework [[https://github.com/lunarmodules/busted][busted]] and exit.
-Notice that although if busted (or luarocks) is not installed,
-these tests will not be run,
-it is not necessary to install =luarocks= or busted to run seamstress.
-
-At startup, seamstress opens a Lua environment and executes the (equivalent of the)
-following Lua code.
-#+begin_src lua
-  function loadConfig()
-    local not_new = {}
-    for key, _ in pairs(_G) do
-      table.insert(not_new, key)
-    end
-    local ok, err = pcall(dofile, os.getenv("SEAMSTRESS_HOME") ..
-                          package.config:sub(1,1) ..
-                          os.getenv("SEAMSTRESS_CONFIG_FILENAME"))
-    if not ok then
-      if err:find("No such file or directory") then return end
-      error(err)
-    end
-    for key, value in pairs(_G) do
-      local found = false
-      for _, other in ipairs(not_new) do
-        if key == other then
-          found = true
-          break
-        end
-      end
-      if found == false then
-        seamstress.config[key] = value
-        _G[key] = nil
-      end
-    end
-  end
-  
-  seamstress = require "seamstress"
-  loadConfig()
-  seamstress.event = require "seamstress.event"
-  pcall(dofile, seamstress.config.script_name)
-  seamstress.event.publish({ "init" })
-#+end_src
-The function =loadConfig()=, in words, scans the global table,
-storing keys it finds in the array =not_new=.
-Then it loads the seamstress config file,
-which on Unix-like systems is found at (in Bash notation)
-=$SEAMSTRESS_HOME/$SEAMSTRESS_CONFIG_FILENAME=
-and then scans the global table again.
-This time, any new keys are placed under =seamstress.config= and removed from the global table.
-this frees up the syntax of the config file,
-using global variables instead of worrying about namespacing under =seamstress=.
-Naturally all entries under =seamstress.config= are made available to user scripts.
-Some seamstress modules may alter their behavior depending on configuration;
-refer to the module’s documentation for information on what is available.
-
-It’s worth noting: the call to =dofile= means that code in =config.lua= is /evaluated./
-This makes configuring seamstress a powerful opportunity in and of itself,
-akin to configuring [[https://github.com/neovim/neovim][neovim]].
-
-After the configuration step, the seamstress script is also evaluated.
-As with the configuration file (indeed, the evaluation of any Lua file),
-any top-level code statements are executed.
-As a reminder, the nature of Lua is that files are executed from top to bottom.
-In particular, functions must be declared before they are used.
-Consider the following example code.
-#+begin_src lua
-  f() -- error: attempt to call a nil value (global 'f')
-
-  function g()
-    f() -- this won't function correctly if f below is made local
-  end
-
-  function f()
-    print "f is defined!"
-  end
-
-  f() -- prints "f is defined!"
-  g() -- prints "f is defined!"
-
-  local function h()
-    print "h is a local function!"
-  end
-
-  function k()
-    h() -- this will work because k "closes over" h, which is already defined.
-  end
-
-  k() -- prints "h is a local function!"
-#+end_src
-
-Finally, after all of these events, an “init” event is posted;
-see more about the seamstress event system below.
-
-** Events
-Not to be confused with the event loop,
-seamstress includes a “pub/sub” event system,
-similar in design to the LuaRocks project [[https://github.com/Olivine-Labs/mediator_lua][mediator]].
-This system is available under =seamstress.event=
-(and as =require "seamstress.event"=).
-
-This system is thoroughly integrated into seamstress’s module system;
-many modules default to posting an event when they wish
-to make changes in the environment available
-to the running script.
-
-There are a few concepts to explain: “Channels”, “Subscribers”, “namespaces” and “callbacks”.
-
-*** Channels
-A =Channel= is a Lua table which holds a table of sub-channels and callbacks
-(really =Subscriber= objects).
-Channels can be retrieved by calling =seamstress.event.get(namespace)=,
-where =namespace= is an array of strings representing the namespace of the channel.
-
-*** Namespaces and callbacks
-Channels and their callbacks are “namespaced” by using an array of strings,
-={ "like", "this" }=,
-with handlers for more general namespaces being called after more qualified handlers.
-In =lua-ls= notation,
-each handler callback is a Lua function that should have “signature”
-=fun(event: string[], …): boolean, any?=.
-That is, an event handler callback takes as arguments the (fully qualified)
-namespace for the event,
-followed by any arguments passed after the event to =seamstress.event.publish=.
-The function should always return either =true= or =false=
-and may optionally return another value.
-These optional values are collected into an array
-which is returned by the =seamstress.event.publish= call.
-The boolean indicates whether other handlers should be called after this one;
-=true= for yes and =false= for no.
-
-*** Subscribers
-A =Subscriber= is a Lua table holding a callback function and some options.
-Subscribers are created (and registered to a namespace)
-with the =seamstress.event.addSubscriber(namespace, fn, options)= function.
-Here, =namespace= is an array of strings,
-and =options= is an optional table,
-with two meaningful entries: =priority= and =predicate=.
-If =priority= is a non-nil positive integer,
-it represents the order in which the callback should be called;
-=1= for first, =2= for second, and so on.
-A priority of =0= will be evaluated last.
-If =predicate= is a non-nil function,
-it will be evaluated with the arguments to =seamstress.event.publish=
-and the callback will be skipped if =predicate= does not return a truthy value.
-As mentioned above, =fn= should be a Lua function of “signature”
-=fun(event: string[], …): boolean, any?=.
-
-Calls to =seamstress.event.addSubscriber= will return the created =Subscriber= table;
-they can also be retrieved by calling =seamstress.event.getSubscriber=
-with the value of =subscriber.id=,
-and can be removed with =seamstress.event.removeSubscriber=.
-
-*** Publishing an event
-When calling =seamstress.event.publish(namespace, …)=,
-each of the callback functions registered at the given namespace
-is called in order of priority.
-As mentioned above, each function should be a Lua function of “signature”
-=fun(event: string[], …): boolean, any?=.
-If the first return value is falsey,
-subsequent callbacks are not called and =seamstress.event.publish= returns.
-Any subsequent return values are coalesced into a list, which is returned
-when =seamstress.event.publish= finishes.
-
-Consider a call to =seamstress.event.publish({ "nested", "namespace" })=.
-If all of the callbacks registered at ={ "nested", "namespace" }= return truthy values,
-the call to =publish= continues by calling callbacks registered at ={ "nested" }=
-(and finally at the “root” namespace ={}=).
-
-** Asynchronous code
-Seamstress provides JavaScript-style asynchronous code execution
-via =require 'seamstress.async'= and =require 'seamstress.async.Promise'=.
-Like the pub/sub event system,
-these modules are also automatically available as
-=seamstress.async= and =seamstress.async.Promise=.
-
-*** Promises
-A =Promise= is an opaque handle to a unit of code execution
-which is driven by the seamstress event loop.
-Like many seamstress object types,
-one creates =Promise= objects by calling =seamstress.async.Promise=
-as a function.
-This function takes at least one argument,
-which should be a function.
-Any further arguments are passed to this function as its arguments.
-Under the hood,
-this function is executed on a separate Lua [[https://www.lua.org/manual/5.4/manual.html#2.6][coroutine]],
-and so can call =coroutine.yield= and other yielding functions.
-
-As in JavaScript, functions passed to =seamstress.async.Promise= always execute
-and have no builtin cancelation mechanism.
-Every time a =Promise= function yields,
-the seamstress event loop schedules an event which will resume the function’s execution until it returns or errors.
-
-Therefore a =Promise= is in one of three states:
-it is either mid-execution, in which case it is “pending”,
-or it has “settled”, either successfully, in which case we say
-the Promise is “resolved”, or there was an error,
-in which case the Promise is “rejected”.
-To sequence code to execute after a Promise has settled,
-call its =anon= method.
-
-**** Promise:anon
-=Promise:anon(resolve, reject)= takes one (optionally two) functions as arguments.
-The first, =resolve=, will be called if the Promise resolves,
-and receives any values returned by the given Promise as arguments.
-The second, =reject=, defaults to =function(err) error(err) end=
-and will be called if the Promise rejects with error message =err=.
-=Promise:anon= returns a new Promise,
-which settles once the initial Promise has settled.
-Note that this new Promise will /resolve/ in all cases
-unless the =resolve= or =reject= handler itself throws an error.
-
-**** Promise:catch and Promise:finally
-There are two convenience methods,
-=catch= and =finally= provided.
-=Promise:catch(reject)= is equivalent to calling =Promise:anon(resolve, reject)= with =resolve = function(...) return ... end=,
-while =Promise:finally(handler)= is equivalent to calling
-=Promise:anon(handler, handler)=.
-
-**** Promise.any, Promise.all and Promise.race
-These functions (which are called as =semastress.async.Promise.all=,
-for example, and not as methods on a Promise object)
-provide a convenient method for many-to-one transformations on Promises.
-Each one takes in a variable number of Promises as arguments
-and returns a new Promise
-whose settling is dependent on the settling of the arguments passed in.
-=Promise.all=, for instance,
-will resolve once all its arguments resolve,
-but will reject if any of them reject.
-=Promise.any= resolves it any of its arguments resolve,
-and rejects only once all of them reject.
-=Promise.race= settles in the same way as the first of its arguments to settle.
-Note that =Promise.race=, for instance,
-does not cancel execution of any of its arguments
-even though it may settle faster than some of them.
-
-*** =async= functions
-Similar to =seamstress.async.Promise=,
-the table =seamstress.async= is also callable as a function,
-taking in a function as an argument.
-Unlike =seamstress.async.Promise=,
-calling =seamstress.async= returns a /function,/
-which returns a =Promise= when called.
-For example, consider the following code
-
-#+begin_src lua
-  local fn = seamstress.async(function(x) return x + 2 end)
-  local promise = fn(5)
-  promise:anon(function(x) print("received " .. x) end)
-  -- prints "received 7"
-#+end_src
-
-That is, every invocation of =fn=
-will return a new Promise
-which corresponds to a new asynchronous invocation of the function
-initally passed as an argument to the call to =seamstress.async=.
-This Promise may be chained with =anon= like any other.
-
-*** Promise:await
-When in an asynchornous context, like within a Promise,
-one may use =Promise:await= as a convenient way of “unwrapping” Promise objects to get the values they return.
-For example, consider the following code
-
-#+begin_src lua
-  local fn = seamstress.async(function(x) return x + 2 end)
-  local promise = seamstress.async.Promise(function()
-      local y = fn(5):await()
-      print("received " .. y)
-      -- prints "received 7"
-  end)
-#+end_src
-
-In this code, =fn(5):await()=
-creates a new Promise object and invokes its =await()= method.
-This method repeatedly yields the current coroutine
-(hence must be called from within an asynchronous context like a coroutine)
-until the Promise settles.
-If the Promise resolves,
-any values returned by the Promise
-are themselves returned by the call to =await()=.
-If the Promise rejects,
-an error is thrown.
-Thus the above code is functionally identical to—but perhaps easier to read than—the following code
-
-#+begin_src lua
-  local fn = seamstress.async(function(x) return x + 2 end)
-  local promise = seamstress.async.Promise(function()
-      local p = fn(5)
-      p:anon(function(y)
-          print("received " .. y)
-      end, function(err) error(err) end)
-  end)
-#+end_src
-
+I develop Seamstress primarily on macOS.
+It is a design goal for Seamstress to be cross-platform,
+but I may not always be able to focus much effort towards this on my own;
+If you're able to help in this, I'd be very grateful for your support.
