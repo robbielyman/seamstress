@@ -1,10 +1,4 @@
 pub fn main() !void {
-    // logging
-    const logfile = try std.fs.cwd().createFile("/tmp/seamstress.log", .{});
-    var bw = std.io.bufferedWriter(logfile.writer());
-    defer bw.flush() catch {};
-    log_writer = bw.writer().any();
-
     // allocation
     var gpa: if (builtin.mode == .Debug) std.heap.GeneralPurposeAllocator(.{
         .stack_trace_frames = 20,
@@ -17,6 +11,19 @@ pub fn main() !void {
         }
     };
     const allocator = if (builtin.mode == .Debug) gpa.allocator() else std.heap.c_allocator;
+
+    // logging
+    var bw = blk: {
+        const cache_base = try folders.open(allocator, .cache, .{}) orelse break :blk null;
+        try cache_base.makePath("seamstress");
+        const path = "seamstress" ++ std.fs.path.sep_str ++ "seamstress.log";
+        const logfile = try cache_base.createFile(path, .{ .truncate = false });
+        const end = try logfile.getEndPos();
+        try logfile.seekTo(end);
+        break :blk std.io.bufferedWriter(logfile.writer());
+    };
+    defer if (bw) |*w| w.flush() catch {};
+    if (bw) |*w| log_writer = w.writer().any();
 
     // arguments
     {
@@ -83,7 +90,7 @@ pub fn main() !void {
 
     try Seamstress.main(l);
     // flush any accumulated logs
-    try bw.flush();
+    if (bw) |*w| try w.flush();
     // in release modes, this calls `exit(0)`, saving us from having to wait for memory to be freed
     std.process.cleanExit();
 }
@@ -216,12 +223,18 @@ pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_
     @call(.always_inline, std.builtin.default_panic, .{ msg, error_return_trace, ret_addr });
 }
 
+pub const known_folders_config: folders.KnownFolderConfig = .{
+    .xdg_force_default = true,
+    .xdg_on_mac = true,
+};
+
 const std = @import("std");
 const builtin = @import("builtin");
 const Seamstress = @import("seamstress.zig");
 const ziglua = @import("ziglua");
 const Lua = ziglua.Lua;
 const lu = @import("lua_util.zig");
+const folders = @import("known-folders");
 
 test "ref" {
     _ = Seamstress;

@@ -180,7 +180,7 @@ pub fn build(b: *std.Build) !void {
 
 fn createImports(b: *std.Build, options: Options) []const Dep {
     var list: std.ArrayListUnmanaged(Dep) = .{};
-    list.ensureTotalCapacity(b.allocator, 4) catch @panic("OOM");
+    list.ensureTotalCapacity(b.allocator, 5) catch @panic("OOM");
 
     const ziglua = b.dependency("ziglua", .{
         .target = options.target,
@@ -194,9 +194,11 @@ fn createImports(b: *std.Build, options: Options) []const Dep {
         .target = options.target,
         .optimize = options.optimize,
     });
+    const @"known-folders" = b.dependency("known-folders", .{});
     list.appendAssumeCapacity(.{ .module = ziglua.module("ziglua"), .name = "ziglua" });
     list.appendAssumeCapacity(.{ .module = xev.module("xev"), .name = "xev" });
     list.appendAssumeCapacity(.{ .module = zosc.module("zosc"), .name = "zosc" });
+    list.appendAssumeCapacity(.{ .module = @"known-folders".module("known-folders"), .name = "known-folders" });
 
     return list.items;
 }

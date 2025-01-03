@@ -19,5 +19,9 @@
             .url = "git+https://github.com/robbielyman/EmbedFile.zig#b5ae28c2812a510de762b41cea489aad80bc039a",
             .hash = "1220633202df3bfbf2436d80dee0cf94b7eeab59177b4d777680f175a08fa8deaf41",
         },
+        .@"known-folders" = .{
+            .url = "git+https://github.com/ziglibs/known-folders#1cceeb70e77dec941a4178160ff6c8d05a74de6f",
+            .hash = "12205f5e7505c96573f6fc5144592ec38942fb0a326d692f9cddc0c7dd38f9028f29",
+        },
     },
 }
