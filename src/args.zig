@@ -109,7 +109,7 @@ fn fatalHelp() noreturn {
         path,
         std.fs.path.sep_str ++ "seamstress" ++ std.fs.path.sep_str ++ "seamstress.log",
         levelsString(),
-        args.level,
+        args.level.asText(),
     });
 }
 
