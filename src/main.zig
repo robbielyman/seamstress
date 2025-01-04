@@ -100,4 +100,5 @@ const Env = @import("env.zig");
 
 test "ref" {
     _ = Seamstress;
+    _ = logging;
 }

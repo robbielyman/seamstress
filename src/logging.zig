@@ -47,7 +47,7 @@ fn init2(gpa: std.mem.Allocator, path: ?[]const u8, level: std.log.Level) !void 
     var bw = std.io.bufferedWriter(logfile.writer());
     bw.writer().print(
         \\
-        \\-----seamstress startup time: {}-----
+        \\-----seamstress startup time:  {}-----
         \\
     , .{date}) catch {};
     bw.flush() catch {};
@@ -73,14 +73,14 @@ const Date = struct {
             .seconds = into_day.getSecondsIntoMinute(),
             .minute = into_day.getMinutesIntoHour(),
             .hour = into_day.getHoursIntoDay(),
-            .day = month.day_index,
+            .day = month.day_index + 1,
             .month = month.month.numeric(),
             .year = year.year,
         };
     }
 
     pub fn format(date: Date, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-        try writer.print("{[year]d:0>4}-{[month]d:0>2}-{[day]d:0>2} {[hour]d:0>2}:{[minute]d:0>2}:{[seconds]d:0>2}", date);
+        try writer.print("{[year]d:0>4}-{[month]d:0>2}-{[day]d:0>2} UTC {[hour]d:0>2}:{[minute]d:0>2}:{[seconds]d:0>2}", date);
     }
 
     test format {
@@ -92,9 +92,9 @@ const Date = struct {
             .minute = 27,
             .seconds = 5,
         };
-        var buf: [4 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2]u8 = undefined;
+        var buf: [4 + 1 + 2 + 1 + 2 + 1 + 3 + 1 + 2 + 1 + 2 + 1 + 2]u8 = undefined;
         const str = try std.fmt.bufPrint(&buf, "{}", .{date});
-        try std.testing.expectEqualStrings("2025-01-04 10:27:05", str);
+        try std.testing.expectEqualStrings("2025-01-04 UTC 10:27:05", str);
     }
 };
 
@@ -130,3 +130,7 @@ pub const known_folders_config: folders.KnownFolderConfig = .{
 const std = @import("std");
 const builtin = @import("builtin");
 const folders = @import("known-folders");
+
+test "ref" {
+    _ = Date;
+}
