@@ -102,18 +102,28 @@ pub fn build(b: *std.Build) !void {
         .{ .cpu_arch = .x86_64, .os_tag = .windows },
     };
     const release_step = b.step("release", "build release");
+    const release_mode: std.builtin.OptimizeMode = release_mode: {
+        const version_str = version_str: {
+            const str = std.fs.cwd().readFileAlloc(b.allocator, "version.txt", 1024) catch
+                break :release_mode .ReleaseSafe;
+            const index = std.mem.indexOfAny(u8, str, "\r\n\t ");
+            break :version_str if (index) |n| str[0..n] else str;
+        };
+        const version = std.SemanticVersion.parse(version_str) catch break :release_mode .ReleaseSafe;
+        break :release_mode if (version.pre != null) .ReleaseSafe else .ReleaseFast;
+    };
     for (release_targets) |release_target| {
         const t = b.resolveTargetQuery(release_target);
         const release_exe = b.addExecutable(.{
             .name = "seamstress",
             .root_source_file = b.path("src/main.zig"),
             .target = t,
-            .optimize = .ReleaseFast,
+            .optimize = release_mode,
             .link_libc = true,
         });
         const target_deps = createImports(b, .{
             .target = t,
-            .optimize = .ReleaseFast,
+            .optimize = release_mode,
         });
         for (target_deps) |dep| dep.addImport(&release_exe.root_module);
 
@@ -201,6 +211,5 @@ fn createImports(b: *std.Build, options: Options) []const Dep {
     list.appendAssumeCapacity(.{ .module = zosc.module("zosc"), .name = "zosc" });
     list.appendAssumeCapacity(.{ .module = @"known-folders".module("known-folders"), .name = "known-folders" });
     list.appendAssumeCapacity(.{ .module = assets, .name = "assets" });
-
     return list.items;
 }

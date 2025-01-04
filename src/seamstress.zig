@@ -1,5 +1,40 @@
 const Seamstress = @This();
 
+pub const RunArgs = struct {
+    file: ?[]const u8,
+    tests: struct {
+        run_tests: bool,
+        dir: ?[]const u8,
+    },
+
+    fn push(run_args: RunArgs, l: *Lua) void {
+        // create arg table
+        l.newTable();
+        _ = l.pushStringZ("seamstress");
+        l.setIndex(-2, 0);
+        var idx: ziglua.Integer = 1;
+        if (run_args.file) |f| {
+            _ = l.pushString(f);
+            l.setIndex(-2, idx);
+            idx += 1;
+        }
+        if (run_args.tests.run_tests) {
+            _ = l.pushStringZ("--test");
+            l.setIndex(-2, idx);
+            idx += 1;
+        }
+        if (run_args.tests.dir) |dir| {
+            _ = l.pushStringZ("--test-dir");
+            l.setIndex(-2, idx);
+            idx += 1;
+            _ = l.pushString(dir);
+            l.setIndex(-2, idx);
+            idx += 1;
+        }
+        l.setGlobal("arg");
+    }
+};
+
 loop: xev.Loop,
 pool: xev.ThreadPool,
 lua: *Lua,
@@ -75,8 +110,9 @@ pub fn init(self: *Seamstress, l: *Lua) !void {
     };
 }
 
-pub fn main(l: *Lua) !void {
+pub fn main(l: *Lua, run_args: RunArgs) !void {
     l.openLibs();
+    run_args.push(l);
     // we want a zig stack trace
     _ = l.atPanic(ziglua.wrap(struct {
         fn panic(lua: *Lua) i32 { // function panic(error_msg)
@@ -91,42 +127,85 @@ pub fn main(l: *Lua) !void {
     lu.load(l, "seamstress");
     const seamstress = l.toUserdata(Seamstress, -1) catch unreachable;
     l.setGlobal("seamstress");
-    blk: {
-        const args = std.process.argsAlloc(l.allocator()) catch break :blk;
-        defer std.process.argsFree(l.allocator(), args);
-        if (args.len >= 2)
-            if (std.mem.eql(u8, "test", args[1]))
-                break :blk;
+    const only_tests = run_args.tests.run_tests and run_args.file == null;
+    if (!only_tests) {
         lu.load(l, "seamstress.repl");
-        l.pop(1);
         lu.load(l, "seamstress.cli");
+        l.pop(2);
+    }
+    if (run_args.tests.run_tests) {
+        lu.load(l, "seamstress.test");
         l.pop(1);
     }
     var c: xev.Completion = .{};
-    seamstress.loop.timer(&c, 0, seamstress, struct {
-        fn f(ud: ?*anyopaque, _: *xev.Loop, _: *xev.Completion, r: xev.Result) xev.CallbackAction {
+    const callbacks = struct {
+        fn initWithTestAndFile(ud: ?*anyopaque, loop: *xev.Loop, i_c: *xev.Completion, r: xev.Result) xev.CallbackAction {
             const s: *Seamstress = @ptrCast(@alignCast(ud.?));
-            blk: {
-                const args = std.process.argsAlloc(s.lua.allocator()) catch break :blk;
-                defer std.process.argsFree(s.lua.allocator(), args);
-                if (args.len < 2) break :blk;
-                if (std.mem.eql(u8, "test", args[1])) {
-                    lu.load(s.lua, "seamstress.test");
-                    break :blk;
-                }
-                s.lua.doFile(args[1]) catch {
-                    lu.reportError(s.lua);
-                };
-            }
-            lu.preparePublish(s.lua, &.{"init"});
-            lu.doCall(s.lua, 1, 0) catch {
+            lu.load(s.lua, "seamstress.test");
+            lu.doCall(s.lua, 0, 0) catch {
                 lu.reportError(s.lua);
                 return .disarm;
             };
-            _ = r.timer catch return .disarm;
+            return initWithFile(ud, loop, i_c, r);
+        }
+
+        fn initWithTest(ud: ?*anyopaque, loop: *xev.Loop, i_c: *xev.Completion, r: xev.Result) xev.CallbackAction {
+            const s: *Seamstress = @ptrCast(@alignCast(ud.?));
+            lu.load(s.lua, "seamstress.test");
+            lu.doCall(s.lua, 0, 0) catch {
+                lu.reportError(s.lua);
+                return .disarm;
+            };
+            return callInit(ud, loop, i_c, r);
+        }
+
+        fn initWithFile(ud: ?*anyopaque, loop: *xev.Loop, i_c: *xev.Completion, r: xev.Result) xev.CallbackAction {
+            const s: *Seamstress = @ptrCast(@alignCast(ud.?));
+            blk: {
+                _ = s.lua.getGlobal("arg") catch break :blk;
+                _ = s.lua.getIndex(-1, 1);
+                const filename = filename: {
+                    const filename = s.lua.toString(-1) catch break :blk;
+                    if (std.fs.path.extension(filename).len == 0) {
+                        _ = s.lua.pushStringZ(".lua");
+                        s.lua.concat(2);
+                        break :filename s.lua.toString(-1) catch unreachable;
+                    } else break :filename filename;
+                };
+                s.lua.pop(2);
+                s.lua.doFile(filename) catch {
+                    _ = s.lua.pushFString(
+                        \\error while loading %s:
+                        \\
+                    , .{filename.ptr});
+                    s.lua.rotate(-2, 1);
+                    s.lua.concat(2);
+                    lu.reportError(s.lua);
+                };
+            }
+            return callInit(ud, loop, i_c, r);
+        }
+
+        fn callInit(ud: ?*anyopaque, _: *xev.Loop, _: *xev.Completion, r: xev.Result) xev.CallbackAction {
+            const s: *Seamstress = @ptrCast(@alignCast(ud.?));
+            lu.preparePublish(s.lua, &.{"init"});
+            lu.doCall(s.lua, 1, 0) catch {
+                lu.reportError(s.lua);
+            };
+            _ = r.timer catch {};
             return .disarm;
         }
-    }.f);
+    };
+
+    if (run_args.tests.run_tests) {
+        if (run_args.file != null)
+            seamstress.loop.timer(&c, 0, seamstress, callbacks.initWithTestAndFile)
+        else
+            seamstress.loop.timer(&c, 0, seamstress, callbacks.initWithTest);
+    } else if (run_args.file != null)
+        seamstress.loop.timer(&c, 0, seamstress, callbacks.initWithFile)
+    else
+        seamstress.loop.timer(&c, 0, seamstress, callbacks.callInit);
     seamstress.status = .running;
     try seamstress.loop.run(.until_done);
 }
