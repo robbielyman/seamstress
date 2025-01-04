@@ -1,6 +1,10 @@
 pub const Args = struct {
     path: ?[]const u8 = null,
-    level: std.log.Level = .warn,
+    level: std.log.Level = switch (builtin.mode) {
+        .ReleaseFast => .err,
+        .Debug => .debug,
+        else => .warn,
+    },
 };
 
 pub fn init(gpa: std.mem.Allocator, args: Args) void {

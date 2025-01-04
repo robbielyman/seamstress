@@ -80,6 +80,7 @@ fn fatalHelp() noreturn {
     var fba = std.heap.FixedBufferAllocator.init(&buf);
     const allocator = fba.allocator();
     const path = folders.getPath(allocator, .cache) catch unreachable orelse unreachable;
+    const args: logging.Args = .{};
     fatal(
         \\seamstress is an art engine
         \\seamstress version: {} optimization level: {s}
@@ -108,7 +109,7 @@ fn fatalHelp() noreturn {
         path,
         std.fs.path.sep_str ++ "seamstress" ++ std.fs.path.sep_str ++ "seamstress.log",
         levelsString(),
-        @tagName(max_level),
+        args.level,
     });
 }
 
