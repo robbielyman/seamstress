@@ -8,7 +8,7 @@ Seamstress version 2 is *alpha* software.
 * Usage
 
 Currently Seamstress is a very bare-bones command-line program.
-You can load a Lua file by running `seamstress FILENAME`,
+You can load a Lua file by running =seamstress FILENAME=,
 or execute Lua code from the REPL prompt.
 
 * Installation
