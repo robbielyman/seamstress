@@ -121,8 +121,8 @@ pub fn main(l: *Lua, run_args: RunArgs) !void {
             lua.traceback(lua, error_msg, 1); // local with_stack_trace = debug.traceback(error_msg, 1)
             const with_stack_trace = lua.toString(-1) catch unreachable;
             @call(.always_inline, std.debug.panic, .{ "lua crashed: {s}", .{with_stack_trace} });
+            // no need to return anything since std.debug.panic is of type noreturn
         }
-        // no need to return anything since std.debug.panic is of type noreturn
     }.panic));
     lu.load(l, "seamstress");
     const seamstress = l.toUserdata(Seamstress, -1) catch unreachable;

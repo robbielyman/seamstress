@@ -12,7 +12,10 @@ old: switch (builtin.os.tag) {
 },
 
 pub fn set(gpa: std.mem.Allocator) ?Env {
-    var env = Env.init(gpa) catch return null;
+    var env = Env.init(gpa) catch |err| {
+        std.log.scoped(.env).warn("environment not set; encountered error: {s}", .{@errorName(err)});
+        return null;
+    };
     env.old = switch (builtin.os.tag) {
         .macos, .linux => std.c.environ,
         .windows => std.os.windows.peb().ProcessParameters.Environment,
@@ -29,6 +32,7 @@ pub fn init(gpa: std.mem.Allocator) !Env {
             .allocator = gpa,
             .argv = &.{ "luarocks", "path" },
         }) catch |err| {
+            std.log.scoped(.env).warn("error running luarocks path: {s}", .{@errorName(err)});
             if (err == error.FileNotFound) break :luarocks;
             return err;
         };
@@ -42,6 +46,7 @@ pub fn init(gpa: std.mem.Allocator) !Env {
             const equals = std.mem.indexOfScalar(u8, inner, '=') orelse continue;
             const key = inner[0..equals];
             const value = inner[equals + 2 .. inner.len - 1];
+            std.log.scoped(.env).debug("setting {s} to {s}", .{ key, value });
             try map.put(key, value);
         }
     }

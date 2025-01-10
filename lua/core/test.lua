@@ -171,15 +171,10 @@ end
 
 local ok, busted = pcall(require, 'busted')
 if ok then
-  local ret = seamstress.async(runner)
-  event.addSubscriber({ 'init' }, function()
-    seamstress.async.Promise(function()
-      ret():await()
+  return seamstress.async(function()
+      seamstress.async.Promise(runner):await()
       seamstress:stop()
-    end)
-    return false
   end)
-  return ret
 end
 
 return function()

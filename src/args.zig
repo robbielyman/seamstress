@@ -3,6 +3,22 @@ const Args = @This();
 logging: logging.Args,
 run: Seamstress.RunArgs,
 
+pub fn format(args: Args, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+    try writer.print("log file: {s}, log level: {s}\n", .{ args.logging.path orelse "default", switch (args.logging.level) {
+        .err => "error",
+        .warn => "warning",
+        .info => "info",
+        .debug => "debug",
+    } });
+    if (args.run.file) |name| {
+        try writer.print("root lua file: {s}\n", .{name});
+    }
+    if (!args.run.tests.run_tests) return;
+    try writer.writeAll("running tests\n");
+    const dir = args.run.tests.dir orelse return;
+    try writer.print("additional tests directory: {s}\n", .{dir});
+}
+
 pub fn process(cli_args: []const []const u8) Args {
     var file: ?[]const u8 = null;
     var logging_arg: logging.Args = .{};

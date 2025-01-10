@@ -411,24 +411,44 @@ fn anonCallback(ptr: ?*anyopaque, loop: *xev.Loop, _: *xev.Completion, r: xev.As
     return .disarm;
 }
 
-pub fn waitForLua(
-    l: *Lua,
-    num_args: i32,
-) !void {
+pub fn waitForLua(l: *Lua, waiting_on: union(enum) {
+    function_with_num_args: i32,
+    async_function_with_num_args: i32,
+    promise: void,
+}) !void {
     const builtin = @import("builtin");
     const a = try xev.Async.init();
     const top = if (builtin.mode == .Debug) blk: {
         const top = l.getTop();
+        const num_args: i32 = switch (waiting_on) {
+            .promise => 0,
+            .function_with_num_args, .async_function_with_num_args => |n| n,
+        };
         std.debug.assert(top >= num_args + 2 + 1);
         break :blk top;
     };
-    lu.load(l, "seamstress.async.Promise");
-    l.rotate(-num_args - 4, 3); // stack is now: closure closure Promise function ...
-    try lu.doCall(l, num_args + 1, 1); // stack is now closure closure returned_promise
+    switch (waiting_on) {
+        .promise => l.rotate(-3, 2), // stack is now: closure closure promise
+        .function_with_num_args => |num_args| {
+            lu.load(l, "seamstress.async.Promise");
+            l.rotate(-num_args - 4, 3); // stack is now: closure closure Promise function ...
+            try lu.doCall(l, num_args + 1, 1); // stack is now closure closure returned_promise
+        },
+        .async_function_with_num_args => |num_args| {
+            l.rotate(-num_args - 3, 3); // stack is now: closure closure function ...
+            try lu.doCall(l, num_args, 1); // stack is now closure closure returned_promise
+        },
+    }
     const promise: *Promise = l.newUserdata(Promise, 3);
     l.pushValue(-1); // copy it
     const handle = try l.ref(ziglua.registry_index); // ref pops
-    defer if (builtin.mode == .Debug) std.debug.assert(l.getTop() + num_args + 2 == top);
+    defer if (builtin.mode == .Debug) {
+        const num_args: i32 = switch (waiting_on) {
+            .promise => 0,
+            .function_with_num_args, .async_function_with_num_args => |n| n,
+        };
+        std.debug.assert(l.getTop() + num_args + 2 == top);
+    };
     const thread = l.newThread();
     l.rotate(-5, -2); // stack is now: returned_promise new_promise thread closure closure
     l.xMove(thread, 2); // pops closures
@@ -438,8 +458,11 @@ pub fn waitForLua(
         .data = .{ .@"async" = a },
     };
     _ = l.getUserValue(-2, 2) catch unreachable; // get the table of dependent promises
+    l.len(-1); // get its length
+    const len = l.toInteger(-1) catch unreachable;
+    l.pop(1);
     l.pushValue(-2); // copy new_promise
-    l.setIndex(-2, 1); // assign as dependent promise
+    l.setIndex(-2, len + 1); // assign as dependent promise
     l.pop(1); // pop the table
     l.rotate(-2, 1); // stack is now new_promise returned_promise
     l.setUserValue(-2, 3) catch unreachable;

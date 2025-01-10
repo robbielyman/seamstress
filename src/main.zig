@@ -11,6 +11,8 @@ pub fn main() !void {
 
     logging.init(allocator, args.logging);
 
+    std.log.scoped(.args).debug("{}", .{args});
+
     defer {
         std.process.argsFree(allocator, cli_args);
         if (gpa.deinit() == .leak) {
@@ -24,7 +26,7 @@ pub fn main() !void {
     const environ = Env.set(allocator);
     defer if (environ) |env| env.deinit(allocator);
 
-    // handle SIGABRT (called by lua in Debug mode)
+    // handle SIGABRT (raised by lua in Debug mode)
     const using_sigaction = builtin.mode == .Debug and builtin.os.tag != .windows;
     if (using_sigaction) setAbrtHandler() catch {};
 

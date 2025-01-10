@@ -158,7 +158,7 @@ fn stdinCallback2(cli: *Cli, l: *Lua, loop: *xev.Loop, c: *xev.Completion, ptr: 
     l.pushValue(-2);
     l.pushClosure(ziglua.wrap(resumeRepl(.failure)), 1);
     l.remove(-3);
-    try lu.waitForLuaCall(l, 0);
+    try lu.waitForLuaCall(l, .{ .function_with_num_args = 0 });
     l.pop(1); // pop the promise
 }
 
