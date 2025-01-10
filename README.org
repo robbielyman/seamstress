@@ -18,6 +18,14 @@ At the moment, Seamstress has very little in terms of external dependencies,
 so I'm optimistic that these are useful artifacts.
 Please let me know if you encounter issues with using them.
 
+I also maintain a [[https://brew.sh][Homebrew]] [[https://github.com/robbielyman/homebrew-seamstress][tap]] for Seamstress.
+To install via homebrew, run the following commands in your shell.
+
+#+begin_src sh
+  brew tap robbielyman/seamstress
+  brew install seamstress
+#+end_src
+
 * Contributing
 
 If you're excited by the Seamstress project, I'd love to collaborate!
