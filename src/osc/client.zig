@@ -1,16 +1,16 @@
 pub fn register(l: *Lua) i32 {
     blk: {
         l.newMetatable("seamstress.osc.Client") catch break :blk;
-        const funcs: []const ziglua.FnReg = &.{
-            .{ .name = "__index", .func = ziglua.wrap(__index) },
-            .{ .name = "__newindex", .func = ziglua.wrap(__newindex) },
-            .{ .name = "__pairs", .func = ziglua.wrap(__pairs) },
-            .{ .name = "dispatch", .func = ziglua.wrap(dispatch) },
+        const funcs: []const zlua.FnReg = &.{
+            .{ .name = "__index", .func = zlua.wrap(__index) },
+            .{ .name = "__newindex", .func = zlua.wrap(__newindex) },
+            .{ .name = "__pairs", .func = zlua.wrap(__pairs) },
+            .{ .name = "dispatch", .func = zlua.wrap(dispatch) },
         };
         l.setFuncs(funcs, 0);
     }
     l.pop(1);
-    l.pushFunction(ziglua.wrap(new));
+    l.pushFunction(zlua.wrap(new));
     return 1;
 }
 
@@ -47,7 +47,7 @@ fn dispatchWhich(l: *Lua, comptime which: enum { bytes, msg }) void {
     l.replace(3);
     _ = l.getMetaField(1, "__pairs") catch unreachable;
     l.pushValue(1);
-    l.call(1, 3); // next, tbl, key
+    l.call(.{ .args = 1, .results = 3 }); // next, tbl, key
     const key = l.getTop();
     const next = key - 2;
     const tbl = key - 1;
@@ -56,7 +56,7 @@ fn dispatchWhich(l: *Lua, comptime which: enum { bytes, msg }) void {
         l.pushValue(next);
         l.pushValue(tbl);
         l.pushValue(key);
-        l.call(2, 2); // next_key, val
+        l.call(.{ .args = 2, .results = 2 }); // next_key, val
         l.copy(-2, key); // set the next key
         if (l.typeOf(key) == .nil) return; // we're done!
         const pattern = l.toString(key) catch unreachable;
@@ -156,7 +156,7 @@ fn dispatch(l: *Lua) i32 {
     if (t == .table) {
         lu.load(l, "seamstress.osc.Message");
         l.pushValue(2);
-        l.call(1, 1);
+        l.call(.{ .args = 1, .results = 1 });
         l.replace(2);
     }
 
@@ -172,7 +172,7 @@ fn new(l: *Lua) i32 {
             l.pop(1);
             _ = l.getField(1, "default");
             if (!lu.isCallable(l, -1)) {
-                l.pushFunction(ziglua.wrap(default));
+                l.pushFunction(zlua.wrap(default));
                 l.setField(1, "default");
             }
             l.pop(1);
@@ -186,7 +186,7 @@ fn new(l: *Lua) i32 {
             const client = l.newUserdata(Client, 2); // create the userdata
             client.* = .{ .addr = addr };
             l.newTable(); // create a new table for the uservalue
-            l.pushFunction(ziglua.wrap(default));
+            l.pushFunction(zlua.wrap(default));
             l.setField(-2, "default");
             l.setUserValue(-2, 1) catch unreachable;
         },
@@ -273,7 +273,7 @@ fn __pairs(l: *Lua) i32 {
         }
     }.f;
     // return iterator, tbl, nil
-    l.pushFunction(ziglua.wrap(iterator));
+    l.pushFunction(zlua.wrap(iterator));
     _ = l.getUserValue(1, 1) catch unreachable;
     l.pushNil();
     return 3;
@@ -286,7 +286,7 @@ fn default(l: *Lua) i32 {
     // we don't use prepare publish because it duplicates the work
     lu.load(l, "seamstress.event");
     _ = l.getField(-1, "publish"); // publish
-    var index: ziglua.Integer = index: {
+    var index: zlua.Integer = index: {
         // messages starting with "/seamstress" result in events without prepended "/seamstress"
         // messages without "/seamstress" instead are namespaced under "osc"
         if (std.mem.eql(u8, "seamstress", iter.peek() orelse return 0)) {
@@ -307,14 +307,14 @@ fn default(l: *Lua) i32 {
     l.pushValue(1); // addr
     l.pushValue(2); // msg
     l.pushValue(3); // time
-    l.call(4, 0); // publish(t, addr, msg, time)
+    l.call(.{ .args = 4 }); // publish(t, addr, msg, time)
     l.pushBoolean(true);
     return 1; // return true
 }
 
 const std = @import("std");
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const osc = @import("../osc.zig");
 const lu = @import("../lua_util.zig");
 const z = @import("zosc");

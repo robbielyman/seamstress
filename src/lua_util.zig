@@ -77,15 +77,15 @@ pub fn luaPrint(l: *Lua, n: ?i32) !void {
     try doCall(l, num_args, 0);
 }
 
-const BufferWriter = std.io.GenericWriter(*ziglua.Buffer, error{}, bufferWrite);
+const BufferWriter = std.io.GenericWriter(*zlua.Buffer, error{}, bufferWrite);
 pub const LuaWriter = std.io.BufferedWriter(4096, BufferWriter);
 
-fn bufferWrite(buf: *ziglua.Buffer, bytes: []const u8) error{}!usize {
+fn bufferWrite(buf: *zlua.Buffer, bytes: []const u8) error{}!usize {
     buf.addString(bytes);
     return bytes.len;
 }
 
-pub fn luaWriter(buf: *ziglua.Buffer) LuaWriter {
+pub fn luaWriter(buf: *zlua.Buffer) LuaWriter {
     const writer: BufferWriter = .{ .context = buf };
     return std.io.bufferedWriter(writer);
 }
@@ -93,7 +93,7 @@ pub fn luaWriter(buf: *ziglua.Buffer) LuaWriter {
 /// uses a Buffer object to print to a lua string
 /// stack effect: +1 (the newly created string)
 pub fn format(l: *Lua, comptime fmt: []const u8, args: anytype) void {
-    var buf: ziglua.Buffer = undefined;
+    var buf: zlua.Buffer = undefined;
     buf.init(l);
     var bw = luaWriter(&buf);
     bw.writer().print(fmt, args) catch unreachable;
@@ -107,7 +107,7 @@ pub fn format(l: *Lua, comptime fmt: []const u8, args: anytype) void {
 pub fn doCall(l: *Lua, nargs: i32, nres: i32) error{LuaFunctionFailed}!void {
     const base = l.getTop() - nargs;
     l.pushLightUserdata(@ptrFromInt(@returnAddress()));
-    l.pushClosure(ziglua.wrap(struct {
+    l.pushClosure(zlua.wrap(struct {
         /// adds a stack trace to the error message on top of the stack
         fn messageHandler(lua: *Lua) i32 {
             const return_address = @intFromPtr(lua.toUserdata(anyopaque, Lua.upvalueIndex(1)) catch unreachable);
@@ -119,7 +119,7 @@ pub fn doCall(l: *Lua, nargs: i32, nres: i32) error{LuaFunctionFailed}!void {
                 },
             };
             lua.traceback(lua, msg, 1);
-            var buf: ziglua.Buffer = undefined;
+            var buf: zlua.Buffer = undefined;
             buf.init(lua);
             lua.rotate(-2, 1);
             buf.addValue();
@@ -135,7 +135,7 @@ pub fn doCall(l: *Lua, nargs: i32, nres: i32) error{LuaFunctionFailed}!void {
         }
     }.messageHandler), 1);
     l.insert(base);
-    const ret = l.protectedCall(nargs, nres, base) catch error.LuaFunctionFailed;
+    const ret = l.protectedCall(.{ .args = nargs, .results = nres, .msg_handler = base }) catch error.LuaFunctionFailed;
     l.remove(base);
     return ret;
 }
@@ -183,7 +183,7 @@ pub fn unrefCallback(ud: ?*anyopaque, loop: *xev.Loop, _: *xev.Completion, resul
     const l = getLua(loop);
     const top = if (builtin.mode == .Debug) l.getTop();
     defer if (builtin.mode == .Debug) std.debug.assert(top == l.getTop()); // stack must be unchanged
-    l.unref(ziglua.registry_index, handleFromPtr(ud)); // release the reference
+    l.unref(zlua.registry_index, handleFromPtr(ud)); // release the reference
     _ = result.cancel catch |err| {
         _ = l.pushFString("unable to cancel: %s", .{@errorName(err).ptr});
         reportError(l);
@@ -205,8 +205,8 @@ pub fn allocator(l: *Lua) std.mem.Allocator {
         std.heap.c_allocator;
 }
 
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const builtin = @import("builtin");
 const std = @import("std");
 const assert = std.debug.assert;

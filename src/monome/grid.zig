@@ -1,26 +1,26 @@
 pub fn register(l: *Lua) i32 {
     blk: {
         l.newMetatable("seamstress.monome.Grid") catch break :blk;
-        const funcs: []const ziglua.FnReg = &.{
-            .{ .name = "__index", .func = ziglua.wrap(common.__index(.grid)) },
-            .{ .name = "__newindex", .func = ziglua.wrap(common.__newindex(.grid)) },
-            .{ .name = "__gc", .func = ziglua.wrap(common.__gc(.grid)) },
-            .{ .name = "refresh", .func = ziglua.wrap(refresh) },
-            .{ .name = "tiltEnable", .func = ziglua.wrap(tiltEnable) },
-            .{ .name = "led", .func = ziglua.wrap(led) },
-            .{ .name = "all", .func = ziglua.wrap(all) },
-            .{ .name = "intensity", .func = ziglua.wrap(intensity) },
-            .{ .name = "connect", .func = ziglua.wrap(common.connect(.grid)) },
-            .{ .name = "info", .func = ziglua.wrap(common.@"/sys/info") },
+        const funcs: []const zlua.FnReg = &.{
+            .{ .name = "__index", .func = zlua.wrap(common.__index(.grid)) },
+            .{ .name = "__newindex", .func = zlua.wrap(common.__newindex(.grid)) },
+            .{ .name = "__gc", .func = zlua.wrap(common.__gc(.grid)) },
+            .{ .name = "refresh", .func = zlua.wrap(refresh) },
+            .{ .name = "tiltEnable", .func = zlua.wrap(tiltEnable) },
+            .{ .name = "led", .func = zlua.wrap(led) },
+            .{ .name = "all", .func = zlua.wrap(all) },
+            .{ .name = "intensity", .func = zlua.wrap(intensity) },
+            .{ .name = "connect", .func = zlua.wrap(common.connect(.grid)) },
+            .{ .name = "info", .func = zlua.wrap(common.@"/sys/info") },
         };
         l.setFuncs(funcs, 0);
     }
     l.pop(1);
     l.newTable();
     l.newTable();
-    const funcs: []const ziglua.FnReg = &.{
-        .{ .name = "__call", .func = ziglua.wrap(__call) },
-        .{ .name = "connect", .func = ziglua.wrap(connect) },
+    const funcs: []const zlua.FnReg = &.{
+        .{ .name = "__call", .func = zlua.wrap(__call) },
+        .{ .name = "connect", .func = zlua.wrap(connect) },
     };
     l.setFuncs(funcs, 0);
     _ = l.pushStringZ("__index");
@@ -55,7 +55,7 @@ fn connect(l: *Lua) i32 {
     // g:connect()
     _ = l.getMetaField(-1, "connect") catch unreachable;
     l.pushValue(-2);
-    l.call(1, 0);
+    l.call(.{ .args = 1 });
     return 1; // return g
 }
 
@@ -172,8 +172,8 @@ fn tiltEnable(l: *Lua) i32 {
     return 0;
 }
 
-fn unrotate(grid: *const Grid, x: ziglua.Integer, y: ziglua.Integer) struct { ziglua.Integer, ziglua.Integer } {
-    const rows: ziglua.Integer, const cols: ziglua.Integer = switch (grid.quads) {
+fn unrotate(grid: *const Grid, x: zlua.Integer, y: zlua.Integer) struct { zlua.Integer, zlua.Integer } {
+    const rows: zlua.Integer, const cols: zlua.Integer = switch (grid.quads) {
         .one => .{ 8, 8 },
         .two => .{ 8, 16 },
         .four => .{ 16, 16 },
@@ -201,12 +201,12 @@ test unrotate {
         .{ .quads = .four, .rotation = .one_eighty },
         .{ .quads = .four, .rotation = .two_seventy },
     };
-    const x_s: []const ziglua.Integer = &.{
+    const x_s: []const zlua.Integer = &.{
         1, 1, 8,  8,
         1, 1, 16, 16,
         1, 1, 16, 16,
     };
-    const y_s: []const ziglua.Integer = &.{
+    const y_s: []const zlua.Integer = &.{
         1, 8,  8,  1,
         1, 8,  8,  1,
         1, 16, 16, 1,
@@ -216,12 +216,12 @@ test unrotate {
         try std.testing.expectEqual(exp_x, x);
         try std.testing.expectEqual(exp_y, y);
     }
-    const x_s2: []const ziglua.Integer = &.{
+    const x_s2: []const zlua.Integer = &.{
         5, 2, 4,  7,
         5, 2, 12, 15,
         5, 2, 12, 15,
     };
-    const y_s2: []const ziglua.Integer = &.{
+    const y_s2: []const zlua.Integer = &.{
         2, 4,  7,  5,
         2, 4,  7,  5,
         2, 12, 15, 5,
@@ -233,15 +233,15 @@ test unrotate {
     }
 }
 
-fn whichQuad(grid: *const Grid, x: ziglua.Integer, y: ziglua.Integer) ziglua.Integer {
+fn whichQuad(grid: *const Grid, x: zlua.Integer, y: zlua.Integer) zlua.Integer {
     return switch (grid.quads) {
         .one => 1,
         .two => if (x > 8) 2 else 1,
-        .four => @as(ziglua.Integer, if (y > 8) 2 else 0) + @as(ziglua.Integer, if (x > 8) 2 else 1),
+        .four => @as(zlua.Integer, if (y > 8) 2 else 0) + @as(zlua.Integer, if (x > 8) 2 else 1),
     };
 }
 
-fn quadIdx(x: ziglua.Integer, y: ziglua.Integer) usize {
+fn quadIdx(x: zlua.Integer, y: zlua.Integer) usize {
     const m_y: usize = @intCast(@mod(y - 1, 8));
     const m_x: usize = @intCast(@mod(x - 1, 8));
     return (m_y * 8) + m_x + 2;
@@ -252,7 +252,7 @@ fn led(l: *Lua) i32 {
     const i_x = common.checkIntegerAcceptingNumber(l, 2);
     const i_y = common.checkIntegerAcceptingNumber(l, 3);
     const x, const y = grid.unrotate(i_x, i_y);
-    const rows: ziglua.Integer, const cols: ziglua.Integer = switch (grid.quads) {
+    const rows: zlua.Integer, const cols: zlua.Integer = switch (grid.quads) {
         .one => .{ 8, 8 },
         .two => .{ 8, 16 },
         .four => .{ 16, 16 },
@@ -273,12 +273,12 @@ fn all(l: *Lua) i32 {
     const grid = l.checkUserdata(Grid, 1, "seamstress.monome.Grid");
     const level = common.checkIntegerAcceptingNumber(l, 2);
     l.argCheck(0 <= level and level <= 15, 2, "level must be between 0 and 15!");
-    const quads: ziglua.Integer = switch (grid.quads) {
+    const quads: zlua.Integer = switch (grid.quads) {
         .one => 1,
         .two => 2,
         .four => 4,
     };
-    var i: ziglua.Integer = 1;
+    var i: zlua.Integer = 1;
     blk: {
         if ((l.getUserValue(1, 2) catch unreachable) == .nil) break :blk;
         while (i <= quads) : (i += 1) {
@@ -366,7 +366,7 @@ pub const Decls = struct {
         var i: i32 = 1;
         while (i <= quads) : (i += 1) {
             l.pushValue(-1); // push the function
-            l.call(0, 1); // call it
+            l.call(.{ .results = 1 }); // call it
             const builder = l.toUserdata(osc.z.Message.Builder, -1) catch unreachable; // the result is a Builder
             const arr = builder.data.addManyAsArray(builder.allocator, 66) catch l.raiseErrorStr("out of memory!", .{}); // add 64 elements
             @memset(arr, .{ .i = 0 }); // all of which are 0-valued integers
@@ -384,7 +384,7 @@ pub const Decls = struct {
         l.pushInteger(x + 1);
         l.pushInteger(y + 1);
         l.pushInteger(z);
-        l.call(3, 0);
+        l.call(.{ .args = 3 });
         return .no;
     }
 
@@ -396,13 +396,13 @@ pub const Decls = struct {
         l.pushInteger(x);
         l.pushInteger(y);
         l.pushInteger(z);
-        l.call(4, 0);
+        l.call(.{ .args = 4 });
         return .no;
     }
 };
 
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const osc = @import("../osc.zig");
 const std = @import("std");
 const lu = @import("../lua_util.zig");

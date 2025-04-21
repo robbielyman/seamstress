@@ -4,15 +4,15 @@
 pub fn register(l: *Lua) i32 {
     blk: {
         l.newMetatable("seamstress.Timer") catch break :blk; // new metatable
-        const funcs: []const ziglua.FnReg = &.{
-            .{ .name = "__index", .func = ziglua.wrap(__index) },
-            .{ .name = "__newindex", .func = ziglua.wrap(__newindex) },
-            .{ .name = "__cancel", .func = ziglua.wrap(__cancel) },
+        const funcs: []const zlua.FnReg = &.{
+            .{ .name = "__index", .func = zlua.wrap(__index) },
+            .{ .name = "__newindex", .func = zlua.wrap(__newindex) },
+            .{ .name = "__cancel", .func = zlua.wrap(__cancel) },
         };
         l.setFuncs(funcs, 0);
     }
     l.pop(1);
-    l.pushFunction(ziglua.wrap(new));
+    l.pushFunction(zlua.wrap(new));
     return 1;
 }
 
@@ -22,7 +22,7 @@ const ptrFromHandle = lu.ptrFromHandle;
 fn __cancel(l: *Lua) i32 {
     const timer = l.checkUserdata(Timer, 1, "seamstress.Timer");
     l.pushValue(1);
-    const handle = l.ref(ziglua.registry_index) catch
+    const handle = l.ref(zlua.registry_index) catch
         std.debug.panic("unable to register Timer!", .{});
     timer.c_c = .{
         .op = .{ .cancel = .{ .c = &timer.c } },
@@ -37,11 +37,11 @@ fn __cancel(l: *Lua) i32 {
                 const lua = lu.getLua(loop);
                 const top = if (builtin.mode == .Debug) lua.getTop();
                 defer if (builtin.mode == .Debug) std.debug.assert(top == lua.getTop()); // stack must be unchanged
-                _ = lua.rawGetIndex(ziglua.registry_index, handleFromPtr(userdata));
+                _ = lua.rawGetIndex(zlua.registry_index, handleFromPtr(userdata));
                 lua.pushBoolean(false);
                 lua.setUserValue(-2, @intFromEnum(Indices.running)) catch unreachable;
                 lua.pop(1);
-                lua.unref(ziglua.registry_index, handleFromPtr(userdata)); // release the reference
+                lua.unref(zlua.registry_index, handleFromPtr(userdata)); // release the reference
                 _ = result.cancel catch |err| {
                     _ = lua.pushFString("unable to cancel: %s", .{@errorName(err).ptr});
                     lu.reportError(lua);
@@ -62,15 +62,15 @@ fn bang(ud: ?*anyopaque, loop: *xev.Loop, c: *xev.Completion, r: xev.Result) xev
     defer if (builtin.mode == .Debug) std.debug.assert(top == l.getTop());
     const handle = handleFromPtr(ud);
     _ = r.timer catch |err| {
-        l.unref(ziglua.registry_index, handle);
+        l.unref(zlua.registry_index, handle);
         if (err == error.Canceled) return .disarm;
         _ = l.pushFString("timer error! %s", .{@errorName(err).ptr});
         lu.reportError(l);
         return .disarm;
     };
-    _ = l.rawGetIndex(ziglua.registry_index, handle); // push Timer userdata
+    _ = l.rawGetIndex(zlua.registry_index, handle); // push Timer userdata
     var rearm = true;
-    defer if (!rearm) l.unref(ziglua.registry_index, handle); // discard timer when not on event loop
+    defer if (!rearm) l.unref(zlua.registry_index, handle); // discard timer when not on event loop
     _ = l.getUserValue(-1, @intFromEnum(Indices.stage_end)) catch unreachable;
     const stage_end = l.toNumber(-1) catch unreachable;
     l.pop(1);
@@ -172,7 +172,7 @@ fn new(l: *Lua) i32 {
     // if running is false, don't start the Timer
     if (!running) return 1;
     l.pushValue(-1); // push the Timer
-    const handle = l.ref(ziglua.registry_index) catch l.raiseErrorStr("unable to register timer!", .{});
+    const handle = l.ref(zlua.registry_index) catch l.raiseErrorStr("unable to register timer!", .{});
     const next: u64 = @intFromFloat(delta * std.time.ms_per_s);
     seamstress.loop.timer(&c.c, next, ptrFromHandle(handle), bang);
     return 1;
@@ -247,7 +247,7 @@ fn __newindex(l: *Lua) i32 {
                         l.setUserValue(1, @intFromEnum(Indices.stage)) catch unreachable;
                         const next: u64 = @intFromFloat(delta * std.time.ms_per_s);
                         l.pushValue(1);
-                        const handle = l.ref(ziglua.registry_index) catch l.raiseErrorStr("unable to register timer!", .{});
+                        const handle = l.ref(zlua.registry_index) catch l.raiseErrorStr("unable to register timer!", .{});
                         seamstress.loop.timer(c, next, ptrFromHandle(handle), bang);
                     }
                     return 0;
@@ -275,8 +275,8 @@ fn __newindex(l: *Lua) i32 {
     return 0;
 }
 
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const xev = @import("xev");
 const lu = @import("lua_util.zig");
 const std = @import("std");

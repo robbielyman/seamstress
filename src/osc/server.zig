@@ -1,20 +1,20 @@
 pub fn register(l: *Lua) i32 {
     blk: {
         l.newMetatable("seamstress.osc.Server") catch break :blk;
-        const funcs: []const ziglua.FnReg = &.{
-            .{ .name = "__index", .func = ziglua.wrap(__index) },
-            .{ .name = "__newindex", .func = ziglua.wrap(__newindex) },
-            .{ .name = "send", .func = ziglua.wrap(send) },
-            .{ .name = "dispatch", .func = ziglua.wrap(dispatch) },
-            .{ .name = "__gc", .func = ziglua.wrap(__gc) },
-            .{ .name = "add", .func = ziglua.wrap(add) },
-            .{ .name = "__cancel", .func = ziglua.wrap(__cancel) },
-            .{ .name = "__pairs", .func = ziglua.wrap(__pairs) },
+        const funcs: []const zlua.FnReg = &.{
+            .{ .name = "__index", .func = zlua.wrap(__index) },
+            .{ .name = "__newindex", .func = zlua.wrap(__newindex) },
+            .{ .name = "send", .func = zlua.wrap(send) },
+            .{ .name = "dispatch", .func = zlua.wrap(dispatch) },
+            .{ .name = "__gc", .func = zlua.wrap(__gc) },
+            .{ .name = "add", .func = zlua.wrap(add) },
+            .{ .name = "__cancel", .func = zlua.wrap(__cancel) },
+            .{ .name = "__pairs", .func = zlua.wrap(__pairs) },
         };
         l.setFuncs(funcs, 0);
     }
     l.pop(1);
-    l.pushFunction(ziglua.wrap(new));
+    l.pushFunction(zlua.wrap(new));
     return 1;
 }
 
@@ -58,7 +58,7 @@ fn add(l: *Lua) i32 {
         .table => {
             lu.load(l, "seamstress.osc.Client");
             l.pushValue(2);
-            l.call(1, 1);
+            l.call(.{ .args = 1, .results = 1 });
             const client = l.toUserdata(@import("client.zig"), -1) catch unreachable;
             osc.pushAddress(l, .string, client.addr);
             l.rotate(-2, 1);
@@ -74,7 +74,7 @@ fn add(l: *Lua) i32 {
 fn run(l: *Lua) !void {
     const self = try l.toUserdata(Server, -1);
     l.pushValue(-1);
-    const handle = try l.ref(ziglua.registry_index);
+    const handle = try l.ref(zlua.registry_index);
     const seamstress = lu.getSeamstress(l);
     self.udp.read(
         &seamstress.loop,
@@ -98,14 +98,14 @@ fn run(l: *Lua) !void {
                 const top = if (builtin.mode == .Debug) lua.getTop();
                 defer if (builtin.mode == .Debug) std.debug.assert(top == lua.getTop()); // stack must be unchanged
                 const len = r catch |err| {
-                    lua.unref(ziglua.registry_index, handleFromPtr(ud)); // release the reference to the server
+                    lua.unref(zlua.registry_index, handleFromPtr(ud)); // release the reference to the server
                     if (err == error.Canceled) return .disarm;
                     _ = lua.pushFString("UDP read error! %s", .{@errorName(err).ptr});
                     lu.reportError(lua);
                     return .disarm;
                 };
                 // runs server:dispatch(addr, bytes)
-                _ = lua.rawGetIndex(ziglua.registry_index, handleFromPtr(ud));
+                _ = lua.rawGetIndex(zlua.registry_index, handleFromPtr(ud));
                 _ = lua.getMetaField(-1, "dispatch") catch unreachable;
                 lua.rotate(-2, 1);
                 osc.pushAddress(lua, .string, addr);
@@ -124,7 +124,7 @@ fn run(l: *Lua) !void {
 fn stop(l: *Lua) !void {
     const server = try l.toUserdata(Server, -1);
     l.pushValue(-1);
-    const handle = try l.ref(ziglua.registry_index);
+    const handle = try l.ref(zlua.registry_index);
     server.c_c = .{
         .op = .{
             .cancel = .{ .c = &server.c },
@@ -173,8 +173,8 @@ fn dispatch(l: *Lua) i32 {
             if (time_exists) {
                 l.pushNil();
                 l.pushValue(4);
-                l.call(4, 0);
-            } else l.call(2, 0);
+                l.call(.{ .args = 4 });
+            } else l.call(.{ .args = 2 });
         },
         .none, .nil => { // no matching client found, use default
             _ = l.getField(1, "default");
@@ -185,8 +185,8 @@ fn dispatch(l: *Lua) i32 {
             l.pushValue(2); // address
             if (time_exists) {
                 l.pushValue(4);
-                l.call(4, 0);
-            } else l.call(3, 0);
+                l.call(.{ .args = 4 });
+            } else l.call(.{ .args = 3 });
         },
         else => l.typeError(1, "seamstress.osc.Server"),
     }
@@ -230,7 +230,7 @@ fn new(l: *Lua) i32 {
         else => unreachable,
     } else { // create a default Client
         lu.load(l, "seamstress.osc.Client");
-        l.call(0, 1);
+        l.call(.{ .results = 1 });
         l.setField(-2, "default");
     }
     l.setUserValue(-2, 1) catch unreachable;
@@ -385,7 +385,7 @@ fn __pairs(l: *Lua) i32 {
         }
     }.f;
     // return iterator, tbl, nil
-    l.pushFunction(ziglua.wrap(iterator));
+    l.pushFunction(zlua.wrap(iterator));
     _ = l.getUserValue(1, 1) catch unreachable;
     l.pushNil();
     return 3;
@@ -393,8 +393,8 @@ fn __pairs(l: *Lua) i32 {
 
 const z = @import("zosc");
 const osc = @import("../osc.zig");
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const xev = @import("xev");
 const std = @import("std");
 const lu = @import("../lua_util.zig");

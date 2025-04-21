@@ -5,7 +5,7 @@ fn findOrCreateDevice(l: *Lua) void {
     l.len(-1); // get the length
     const len = l.toInteger(-1) catch unreachable;
     l.pop(1); // pop length
-    var idx: ziglua.Integer = 1;
+    var idx: zlua.Integer = 1;
     while (idx <= len) : (idx += 1) {
         if (l.getIndex(-1, idx) != .userdata) { // only userdata have uservalues
             l.pop(1);
@@ -20,7 +20,7 @@ fn findOrCreateDevice(l: *Lua) void {
     }
     // if we got here, we need to create a new device
     l.pushValue(-1); // duplicate the table
-    l.call(0, 1); // call it to create a new device
+    l.call(.{ .results = 1 }); // call it to create a new device
     l.pushValue(-1); // duplicate the device
     l.setIndex(-3, len + 1); // assign the copy to the table
     // leave the device at the top of the stack
@@ -71,7 +71,7 @@ pub fn addNewDevice(l: *Lua, server_idx: i32, id: []const u8, @"type": []const u
     if (connected) {
         _ = l.getField(-1, "connect"); // connect
         l.pushValue(-2);
-        l.call(1, 0); // dev:connect()
+        l.call(.{ .args = 1 }); // dev:connect()
     }
     // leave dev on top of the stack
 }
@@ -89,7 +89,7 @@ fn createClient(
     lu.load(l, "seamstress.osc.Client");
     l.newTable(); // the argument: t
     const info = @typeInfo(decls);
-    inline for (info.Struct.decls) |decl| {
+    inline for (info.@"struct".decls) |decl| {
         _ = l.pushString(decl.name); // name
         l.pushValue(dev_idx);
         const arg_types = comptime map.get(decl.name) orelse @compileError("unexpected name!");
@@ -102,7 +102,7 @@ fn createClient(
     l.setField(-2, "type");
     l.pushInteger(port);
     l.setField(-2, "address");
-    l.call(1, 1); // return seamstress.osc.Client(t)
+    l.call(.{ .args = 1, .results = 1 }); // return seamstress.osc.Client(t)
 }
 
 pub fn __index(comptime which: enum { grid, arc }) fn (*Lua) i32 {
@@ -209,7 +209,7 @@ pub fn __newindex(comptime which: enum { grid, arc }) fn (*Lua) i32 {
                 if (prefix[0] == '/') {
                     l.pushValue(3);
                 } else {
-                    var buf: ziglua.Buffer = undefined;
+                    var buf: zlua.Buffer = undefined;
                     buf.init(l);
                     buf.addChar('/');
                     buf.addString(prefix);
@@ -276,7 +276,7 @@ pub fn __gc(comptime which: enum { grid, arc }) fn (*Lua) i32 {
     }.__gc;
 }
 
-pub fn checkIntegerAcceptingNumber(l: *Lua, idx: i32) ziglua.Integer {
+pub fn checkIntegerAcceptingNumber(l: *Lua, idx: i32) zlua.Integer {
     if (l.isInteger(idx)) return l.toInteger(idx) catch unreachable;
     return @intFromFloat(l.checkNumber(idx));
 }
@@ -388,7 +388,7 @@ pub fn connect(comptime which: enum { grid, arc }) fn (*Lua) i32 {
                 var i: i32 = 1;
                 while (i <= 4) : (i += 1) {
                     l.pushValue(-1); // push the function
-                    l.call(0, 1); // call it
+                    l.call(.{ .results = 1 }); // call it
                     const builder = l.toUserdata(osc.z.Message.Builder, -1) catch unreachable; // the result is a Builder
                     const arr = builder.data.addManyAsArray(builder.allocator, 65) catch l.raiseErrorStr("out of memory!", .{}); // add 64 elements
                     @memset(arr, .{ .i = 0 }); // all of which are 0-valued integers
@@ -399,14 +399,14 @@ pub fn connect(comptime which: enum { grid, arc }) fn (*Lua) i32 {
             }
             _ = l.getField(1, "info");
             l.pushValue(1);
-            l.call(1, 0);
+            l.call(.{ .args = 1 });
             return 0;
         }
     }.f;
 }
 
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const osc = @import("../osc.zig");
 const std = @import("std");
 const lu = @import("../lua_util.zig");

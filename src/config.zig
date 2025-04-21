@@ -2,7 +2,7 @@
 pub fn configure(seamstress: *Seamstress) void {
     const l = seamstress.l;
     defer if (interpolated) |str| seamstress.allocator.free(str);
-    l.load(ziglua.wrap(loader), seamstress, "=configure", .text) catch {
+    l.load(zlua.wrap(loader), seamstress, "=configure", .text) catch {
         const err = l.toStringEx(-1);
         panic("{s}", .{err});
     };
@@ -37,8 +37,8 @@ const std = @import("std");
 const Seamstress = @import("seamstress.zig");
 const panic = std.debug.panic;
 const lu = @import("lua_util.zig");
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 
 const script =
     \\return function()

@@ -24,7 +24,7 @@ pub fn register(comptime which: Which) fn (*Lua) i32 {
                 blk: {
                     l.newMetatable("seamstress.async") catch break :blk; // new metatable
                     _ = l.pushStringZ("__call"); // __call
-                    l.pushFunction(ziglua.wrap(@"async")); // fn
+                    l.pushFunction(zlua.wrap(@"async")); // fn
                     l.setTable(-3); // metatable.__call = fn
                 }
                 l.setMetatable(-2); // setmetatable(t, metatable)
@@ -40,11 +40,11 @@ pub fn register(comptime which: Which) fn (*Lua) i32 {
                 blk: {
                     l.newMetatable("seamstress.async.Promise") catch break :blk; // new metatable
                     l.setFuncs(&.{
-                        .{ .name = "anon", .func = ziglua.wrap(anon) },
-                        .{ .name = "catch", .func = ziglua.wrap(@"catch") },
-                        .{ .name = "finally", .func = ziglua.wrap(finally) },
-                        .{ .name = "await", .func = ziglua.wrap(@"await") },
-                        .{ .name = "__cancel", .func = ziglua.wrap(__cancel) },
+                        .{ .name = "anon", .func = zlua.wrap(anon) },
+                        .{ .name = "catch", .func = zlua.wrap(@"catch") },
+                        .{ .name = "finally", .func = zlua.wrap(finally) },
+                        .{ .name = "await", .func = zlua.wrap(@"await") },
+                        .{ .name = "__cancel", .func = zlua.wrap(__cancel) },
                     }, 0); // register functions
                     _ = l.pushStringZ("__index"); // __index
                     l.pushValue(-2); // metatable
@@ -55,13 +55,13 @@ pub fn register(comptime which: Which) fn (*Lua) i32 {
                 l.createTable(0, 3); // t
                 l.createTable(0, 1); // its metatable
                 _ = l.pushStringZ("__call"); // __call
-                l.pushFunction(ziglua.wrap(new)); // function
+                l.pushFunction(zlua.wrap(new)); // function
                 l.setTable(-3); // metatable.__call = function
                 l.setMetatable(-2); // setmetatable(t, metatable)
                 const how: [3]How = .{ .all, .any, .race };
                 inline for (how) |h| {
                     _ = l.pushStringZ(@tagName(h)); // s
-                    l.pushFunction(ziglua.wrap(multi(h))); // f
+                    l.pushFunction(zlua.wrap(multi(h))); // f
                     l.setTable(-3); // t[s] = f
                 }
                 return 1;
@@ -73,7 +73,7 @@ pub fn register(comptime which: Which) fn (*Lua) i32 {
 fn __cancel(l: *Lua) i32 {
     const promise = l.checkUserdata(Promise, 1, "seamstress.async.Promise");
     l.pushValue(1);
-    const handle = l.ref(ziglua.registry_index) catch
+    const handle = l.ref(zlua.registry_index) catch
         std.debug.panic("unable to register Promise!", .{});
     promise.c_c = .{
         .op = .{ .cancel = .{ .c = &promise.c } },
@@ -93,7 +93,7 @@ fn multi(comptime how: How) fn (*Lua) i32 {
         fn f(l: *Lua) i32 {
             const p = oneFromMany(l); // create Promise
             l.pushValue(-1); // push it again
-            const h = l.ref(ziglua.registry_index) catch |err|
+            const h = l.ref(zlua.registry_index) catch |err|
                 l.raiseErrorStr("unable to register Promise! %s", .{@errorName(err).ptr});
             const s = lu.getSeamstress(l);
             p.data.timer.run(&s.loop, &p.c, 2, anyopaque, ptrFromHandle(h), struct {
@@ -106,12 +106,12 @@ fn multi(comptime how: How) fn (*Lua) i32 {
                     const handle = handleFromPtr(ptr);
                     const lua = lu.getLua(loop);
                     _ = r catch |err| {
-                        lua.unref(ziglua.registry_index, handle);
+                        lua.unref(zlua.registry_index, handle);
                         _ = lua.pushFString("unexpected timer error! %s", .{@errorName(err).ptr});
                         lu.reportError(lua);
                         return .disarm;
                     };
-                    _ = lua.rawGetIndex(ziglua.registry_index, handle); // push the Promise onto the stack
+                    _ = lua.rawGetIndex(zlua.registry_index, handle); // push the Promise onto the stack
                     const promise = lua.toUserdata(Promise, -1) catch unreachable;
                     _ = lua.getUserValue(-1, 1) catch unreachable; // get the thread
                     const stack = lua.toThread(-1) catch unreachable;
@@ -127,7 +127,7 @@ fn multi(comptime how: How) fn (*Lua) i32 {
                             .all => promise.status = .fulfilled, // we fulfill
                             .race => promise.status = .fulfilled, // TODO: does this match expectations?
                         }
-                        lua.unref(ziglua.registry_index, handle); // the promise is settled, and we don't need the reference
+                        lua.unref(zlua.registry_index, handle); // the promise is settled, and we don't need the reference
                         promise.data.timer.deinit();
                         return .disarm;
                     }
@@ -193,7 +193,7 @@ fn multi(comptime how: How) fn (*Lua) i32 {
                             var res: i32 = undefined;
                             _ = stack.resumeThread(lua, stack.getTop() - 1, &res) catch if (promise.status == .fulfilled) unreachable else {};
                             // the promise is sttled and we don't need the reference
-                            lua.unref(ziglua.registry_index, handle);
+                            lua.unref(zlua.registry_index, handle);
                             promise.data.timer.deinit();
                             return .disarm;
                         }
@@ -202,7 +202,7 @@ fn multi(comptime how: How) fn (*Lua) i32 {
                         return .disarm;
                     }
                     // if we got here, the promise is settled, and we don't need the reference
-                    lua.unref(ziglua.registry_index, handle);
+                    lua.unref(zlua.registry_index, handle);
                     promise.data.timer.deinit();
                     return .disarm;
                 }
@@ -220,13 +220,13 @@ fn oneFromMany(l: *Lua) *Promise {
     _ = l.getMetatableRegistry("seamstress.async.Promise"); // metatable
     l.setMetatable(-2); // setmetatable(promise, metatable)
     const stack = l.newThread(); // new thread
-    stack.pushFunction(ziglua.wrap(struct {
+    stack.pushFunction(zlua.wrap(struct {
         /// default promise resolution handler
         fn noOp(lua: *Lua) i32 {
             return lua.getTop();
         }
     }.noOp));
-    stack.pushFunction(ziglua.wrap(struct {
+    stack.pushFunction(zlua.wrap(struct {
         /// throws an error
         fn throw(lua: *Lua) i32 {
             lua.raiseError();
@@ -269,7 +269,7 @@ fn new(l: *Lua) i32 {
             l.raiseErorStr("error creating new Promise: %s", .{@errorName(err).ptr}) },
     };
     l.pushValue(-1); // push the Promise
-    const handle = l.ref(ziglua.registry_index) catch |err|
+    const handle = l.ref(zlua.registry_index) catch |err|
         l.raiseErrorStr("unable to register Promise! %s", .{@errorName(err).ptr}); // ref pops
     const s = lu.getSeamstress(l);
     promise.data.timer.run(&s.loop, &promise.c, 2, anyopaque, ptrFromHandle(handle), settle); // add to the event loop
@@ -282,7 +282,7 @@ fn new(l: *Lua) i32 {
 /// from within `f` is valid.
 fn @"async"(lua: *Lua) i32 {
     lu.checkCallable(lua, 2);
-    lua.pushClosure(ziglua.wrap(struct {
+    lua.pushClosure(zlua.wrap(struct {
         /// calls an async function, returning a new Promise
         fn f(l: *Lua) i32 {
             const i = Lua.upvalueIndex(1); // the function we passed into `seamstress.async`
@@ -308,7 +308,7 @@ fn @"async"(lua: *Lua) i32 {
             l.newTable();
             l.setUserValue(-2, 2) catch unreachable; // the table of depending promises
             l.pushValue(-1); // push the Promise again
-            const handle = l.ref(ziglua.registry_index) catch |err| l.raiseErrorStr("unable to register Promise! %s", .{@errorName(err).ptr}); // ref pops
+            const handle = l.ref(zlua.registry_index) catch |err| l.raiseErrorStr("unable to register Promise! %s", .{@errorName(err).ptr}); // ref pops
             const s = lu.getSeamstress(l);
             p.data.timer.run(&s.loop, &p.c, 2, anyopaque, ptrFromHandle(handle), settle); // add to the event loop
             return 1; // return Promise
@@ -322,12 +322,12 @@ fn settle(ptr: ?*anyopaque, loop: *xev.Loop, c: *xev.Completion, r: xev.Timer.Ru
     const l = lu.getLua(loop);
     const handle = handleFromPtr(ptr);
     _ = r catch |err| {
-        l.unref(ziglua.registry_index, handle);
+        l.unref(zlua.registry_index, handle);
         _ = l.pushFString("unexpected timer error! %s", .{@errorName(err).ptr});
         lu.reportError(l);
         return .disarm;
     };
-    _ = l.rawGetIndex(ziglua.registry_index, handle); // push the Promise onto the stack
+    _ = l.rawGetIndex(zlua.registry_index, handle); // push the Promise onto the stack
     const promise = l.toUserdata(Promise, -1) catch unreachable;
     _ = l.getUserValue(-1, 1) catch unreachable; // get the thread
     const thread = l.toThread(-1) catch unreachable;
@@ -354,7 +354,7 @@ fn settle(ptr: ?*anyopaque, loop: *xev.Loop, c: *xev.Completion, r: xev.Timer.Ru
         promise.status = .rejected; // the function had an error
         promise.data.timer.deinit();
     }
-    l.unref(ziglua.registry_index, handle); // if we got here, the promise settled, so we don't need the reference
+    l.unref(zlua.registry_index, handle); // if we got here, the promise settled, so we don't need the reference
     _ = l.getUserValue(-2, 2) catch unreachable; // the table of depending promises
     l.pushNil(); // start the iteration
     while (l.next(-2)) {
@@ -373,12 +373,12 @@ fn anonCallback(ptr: ?*anyopaque, loop: *xev.Loop, _: *xev.Completion, r: xev.As
     const l = lu.getLua(loop);
     const handle = handleFromPtr(ptr);
     _ = r catch |err| {
-        l.unref(ziglua.registry_index, handle);
+        l.unref(zlua.registry_index, handle);
         _ = l.pushFString("unexpected async error! %s", .{@errorName(err).ptr});
         lu.reportError(l);
         return .disarm;
     };
-    _ = l.rawGetIndex(ziglua.registry_index, handle); // push the Promise
+    _ = l.rawGetIndex(zlua.registry_index, handle); // push the Promise
     const promise = l.toUserdata(Promise, -1) catch unreachable;
     _ = l.getUserValue(-1, 3) catch unreachable; // push the other Promise
     const other = l.toUserdata(Promise, -1) catch unreachable;
@@ -401,7 +401,7 @@ fn anonCallback(ptr: ?*anyopaque, loop: *xev.Loop, _: *xev.Completion, r: xev.As
     l.pop(1); // now pop the last promise
     promise.data.@"async".deinit(); // we're done with the Async, so let's ditch it.
     promise.data = .{ .timer = xev.Timer.init() catch |err| {
-        l.unref(ziglua.registry_index, handle);
+        l.unref(zlua.registry_index, handle);
         l.pushFString("error creating new timer: %s", .{@errorName(err).ptr});
         lu.reportError(l);
         return .disarm;
@@ -441,7 +441,7 @@ pub fn waitForLua(l: *Lua, waiting_on: union(enum) {
     }
     const promise: *Promise = l.newUserdata(Promise, 3);
     l.pushValue(-1); // copy it
-    const handle = try l.ref(ziglua.registry_index); // ref pops
+    const handle = try l.ref(zlua.registry_index); // ref pops
     defer if (builtin.mode == .Debug) {
         const num_args: i32 = switch (waiting_on) {
             .promise => 0,
@@ -489,7 +489,7 @@ fn anon(l: *Lua) i32 {
     const other = l.checkUserdata(Promise, 1, "seamstress.async.Promise"); // self should be a Promise
     const promise: *Promise = l.newUserdata(Promise, 3); // create Promise
     l.pushValue(-1); // push the promise
-    const handle = l.ref(ziglua.registry_index) catch |err|
+    const handle = l.ref(zlua.registry_index) catch |err|
         l.raiseErrorStr("unable to register Promise! %s", .{@errorName(err).ptr}); // ref pops
     _ = l.getMetatableRegistry("seamstress.async.Promise"); // metatable
     l.setMetatable(-2); // setmetatable(promise, metatable)
@@ -501,7 +501,7 @@ fn anon(l: *Lua) i32 {
         lu.checkCallable(l, 3); // third argument should be nil or callable
         l.pushValue(3);
     } else {
-        l.pushFunction(ziglua.wrap(throw));
+        l.pushFunction(zlua.wrap(throw));
     }
     const s = lu.getSeamstress(l);
     switch (other.status) {
@@ -559,9 +559,9 @@ fn copyStack(from: *Lua, to: *Lua) void {
 /// Convenient alias for `self:anon(function(...) return ... end, f)`.
 fn @"catch"(l: *Lua) i32 {
     _ = l.checkUserdata(Promise, 1, "seamstress.async.Promise"); // self is a Promise
-    l.pushFunction(ziglua.wrap(anon)); // we're going to call self:anon
+    l.pushFunction(zlua.wrap(anon)); // we're going to call self:anon
     l.pushValue(1); // on self
-    l.pushFunction(ziglua.wrap(struct {
+    l.pushFunction(zlua.wrap(struct {
         /// default promise resolution handler
         fn noOp(lua: *Lua) i32 {
             return lua.getTop();
@@ -569,19 +569,19 @@ fn @"catch"(l: *Lua) i32 {
     }.noOp));
     lu.checkCallable(l, 2); // the second argument should be callable
     l.pushValue(2);
-    l.call(3, 1); // call self:anon
+    l.call(.{ .args = 3, .results = 1 }); // call self:anon
     return 1; // return the new Promise
 }
 
 /// Convenient alias for `self:anon(f, f)`.
 fn finally(l: *Lua) i32 {
     _ = l.checkUserdata(Promise, 1, "seamstress.async.Promise"); // self is a Promise
-    l.pushFunction(ziglua.wrap(anon)); // we're going to call self:anon
+    l.pushFunction(zlua.wrap(anon)); // we're going to call self:anon
     l.pushValue(1); // on self
     lu.checkCallable(l, 2); // the second argument should be callable
     l.pushValue(2); // push it
     l.pushValue(2); // push it again
-    l.call(3, 1); // call self:anon
+    l.call(.{ .args = 3, .results = 1 }); // call self:anon
     return 1; // return the new Promise
 }
 
@@ -591,12 +591,12 @@ fn finally(l: *Lua) i32 {
 fn @"await"(l: *Lua) i32 {
     _ = l.checkUserdata(Promise, 1, "seamstress.async.Promise"); // we're awaiting a Promise
     if (!l.isYieldable()) l.raiseErrorStr("cannot await a Promise outside of an async context (i.e. a coroutine or an async function)", .{}); // we'd better be able to yield
-    l.yieldCont(0, 0, ziglua.wrap(struct {
-        fn @"continue"(lua: *Lua, _: ziglua.Status, _: ziglua.Context) i32 {
+    l.yieldCont(0, 0, zlua.wrap(struct {
+        fn @"continue"(lua: *Lua, _: zlua.Status, _: zlua.Context) i32 {
             const promise: *Promise = lua.checkUserdata(Promise, 1, "seamstress.async.Promise"); // we're awaiting a Promise
             switch (promise.status) {
                 .waiting, .pending => {
-                    lua.yieldCont(0, 0, ziglua.wrap(@This().@"continue")); // we'll keep waiting
+                    lua.yieldCont(0, 0, zlua.wrap(@This().@"continue")); // we'll keep waiting
                 },
                 .fulfilled, .rejected => {
                     _ = lua.getUserValue(1, 1) catch unreachable; // get the Promise's stack
@@ -613,7 +613,7 @@ fn @"await"(l: *Lua) i32 {
 }
 
 const std = @import("std");
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const lu = @import("lua_util.zig");
 const xev = @import("xev");

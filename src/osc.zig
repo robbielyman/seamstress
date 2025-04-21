@@ -23,7 +23,7 @@ pub fn pushAddress(l: *Lua, comptime mode: enum { array, table, string }, addr: 
     var counter = std.io.countingWriter(std.io.null_writer);
     addr.format("", .{}, counter.writer()) catch unreachable;
     const size: usize = @intCast(counter.bytes_written);
-    var buf: ziglua.Buffer = undefined;
+    var buf: zlua.Buffer = undefined;
     const slice = buf.initSize(l, @intCast(size));
     var fbs = std.io.fixedBufferStream(slice);
     addr.format("", .{}, fbs.writer()) catch unreachable;
@@ -31,7 +31,7 @@ pub fn pushAddress(l: *Lua, comptime mode: enum { array, table, string }, addr: 
         .string => buf.pushResultSize(@intCast(size)),
         .array, .table => {
             const colon_idx = std.mem.indexOfScalar(u8, slice, ':').?;
-            const port = std.fmt.parseInt(ziglua.Integer, slice[colon_idx + 1 .. size], 10) catch unreachable;
+            const port = std.fmt.parseInt(zlua.Integer, slice[colon_idx + 1 .. size], 10) catch unreachable;
             buf.pushResultSize(colon_idx);
             l.createTable(2, 0);
             l.rotate(-2, 1);
@@ -144,7 +144,7 @@ pub fn wrap(l: *Lua, comptime arg_types: []const u8, zigFn: anytype, num_upvalue
             return 1;
         }
     }.wrapped;
-    l.pushClosure(ziglua.wrap(wrapped), num_upvalues);
+    l.pushClosure(zlua.wrap(wrapped), num_upvalues);
     l.newTable();
     l.createTable(0, 3);
     l.rotate(-3, -1);
@@ -184,7 +184,7 @@ pub fn pushData(l: *Lua, data: z.Data) void {
         .i, .h => |i| l.pushInteger(i),
         .f, .d => |f| l.pushNumber(f),
         .r => |r| {
-            var buf: ziglua.Buffer = undefined;
+            var buf: zlua.Buffer = undefined;
             const slice = buf.initSize(l, 9);
             _ = std.fmt.bufPrint(slice, "#{x}", .{r}) catch unreachable;
             buf.pushResultSize(9);
@@ -280,8 +280,8 @@ pub fn toData(l: *Lua, tag: ?u8) !z.Data {
 pub const Server = @import("osc/server.zig");
 pub const Client = @import("osc/client.zig");
 pub const z = @import("zosc");
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const lu = @import("lua_util.zig");
 const xev = @import("xev");
 const std = @import("std");

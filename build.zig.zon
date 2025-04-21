@@ -1,27 +1,29 @@
 .{
-    .name = "seamstress",
+    .name = .steamstress,
     .version = "2.0.0-prealpha-3",
+    .fingerprint = 0xd0e1bb1829aedf14,
     .paths = .{ "build.zig.zon", "build.zig", "src", "lua" },
     .dependencies = .{
-        .ziglua = .{
-            .url = "git+https://github.com/robbielyman/ziglua?ref=byo-lua#69a86667f31257e8529a3d20e1799283984bead5",
-            .hash = "12202e945f7d80689f48333beefd8a1993f3a67ca6af400d9c746f1a121fc7cb78fa",
+        .zlua = .{
+            .url = "git+https://github.com/natecraddock/ziglua?ref=main#dfa5b912efe4eaf17e3ae8317b2966ddaa457de6",
+            .hash = "zlua-0.1.0-hGRpC7QOBQBY97K-rliWJXOgrVvFmY9hPTQ5fOsvqDKa",
         },
         .libxev = .{
-            .url = "git+https://github.com/robbielyman/libxev?ref=seamstress-branch#8cfc85b21974996775d7ca8a4febc5d0963e6f7f",
-            .hash = "1220c9e5ef90baa4bcc9ceb73edf54961ca4de5d0bcebec6aff38a20079947b04682",
+            .url = "git+https://github.com/mitchellh/libxev?ref=main#94ed6af7b2aaaeab987fbf87fcee410063df715b",
+            .hash = "libxev-0.0.0-86vtc-zkEgB7uv1i0Sa6ytJETZQi_lHJrImu9mLb9moi",
         },
         .zosc = .{
-            .url = "git+https://github.com/robbielyman/zosc?ref=v1.1.0#ef8caf3c9f86b09b7fbed9fe6d4cdba3a43fb9de",
-            .hash = "12207c108f821340bc3514117afd24bace658bc3ad06b79c51d1440eb498cec4349c",
+            //.url = "git+https://github.com/robbielyman/zosc?ref=v1.1.0#ef8caf3c9f86b09b7fbed9fe6d4cdba3a43fb9de",
+            //.hash = "zosc-0.1.0-AAAAAMNlAQB8EI-CE0C8NRQRev0kus5li8OtBrecUdFE",
+            .path = "../zosc",
         },
-        .@"embed-file" = .{
-            .url = "git+https://github.com/robbielyman/EmbedFile.zig#b5ae28c2812a510de762b41cea489aad80bc039a",
-            .hash = "1220633202df3bfbf2436d80dee0cf94b7eeab59177b4d777680f175a08fa8deaf41",
+        .embed_file = .{
+            .url = "git+https://github.com/robbielyman/EmbedFile.zig?ref=main#67d95b1a7db29bf80fe7db5daeb3878b1002f3e9",
+            .hash = "embed_file-1.0.0-xHnAJbRyAACyaZoX76xXnqJr8ZPsACm12-D4C_VIXEFc",
         },
-        .@"known-folders" = .{
-            .url = "git+https://github.com/ziglibs/known-folders#1cceeb70e77dec941a4178160ff6c8d05a74de6f",
-            .hash = "12205f5e7505c96573f6fc5144592ec38942fb0a326d692f9cddc0c7dd38f9028f29",
+        .known_folders = .{
+            .url = "git+https://github.com/ziglibs/known-folders?ref=master#aa24df42183ad415d10bc0a33e6238c437fc0f59",
+            .hash = "known_folders-0.0.0-Fy-PJtLDAADGDOwYwMkVydMSTp_aN-nfjCZw6qPQ2ECL",
         },
     },
 }

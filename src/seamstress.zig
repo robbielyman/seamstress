@@ -12,7 +12,7 @@ pub const RunArgs = struct {
         l.newTable();
         _ = l.pushStringZ("seamstress");
         l.setIndex(-2, 0);
-        var idx: ziglua.Integer = 1;
+        var idx: zlua.Integer = 1;
         if (run_args.file) |f| {
             _ = l.pushString(f);
             l.setIndex(-2, idx);
@@ -54,29 +54,29 @@ pub fn register(l: *Lua) i32 {
     seamstress.init(l) catch l.raiseErrorStr("unable to create seamstress event loop!", .{});
     blk: {
         l.newMetatable("seamstress") catch break :blk;
-        const funcs: []const ziglua.FnReg = &.{
-            .{ .name = "__index", .func = ziglua.wrap(__index) },
-            .{ .name = "__newindex", .func = ziglua.wrap(__newindex) },
-            .{ .name = "run", .func = ziglua.wrap(run) },
-            .{ .name = "resume", .func = ziglua.wrap(@"resume") },
-            .{ .name = "__gc", .func = ziglua.wrap(__gc) },
+        const funcs: []const zlua.FnReg = &.{
+            .{ .name = "__index", .func = zlua.wrap(__index) },
+            .{ .name = "__newindex", .func = zlua.wrap(__newindex) },
+            .{ .name = "run", .func = zlua.wrap(run) },
+            .{ .name = "resume", .func = zlua.wrap(@"resume") },
+            .{ .name = "__gc", .func = zlua.wrap(__gc) },
         };
         l.setFuncs(funcs, 0);
         l.newTable();
-        const stop_fns: []const ziglua.FnReg = &.{
-            .{ .name = "stop", .func = ziglua.wrap(stop) },
+        const stop_fns: []const zlua.FnReg = &.{
+            .{ .name = "stop", .func = zlua.wrap(stop) },
         };
         l.setFuncs(stop_fns, 1);
         l.newTable();
-        const panic_fns: []const ziglua.FnReg = &.{
-            .{ .name = "panic", .func = ziglua.wrap(panic) },
+        const panic_fns: []const zlua.FnReg = &.{
+            .{ .name = "panic", .func = zlua.wrap(panic) },
         };
         l.setFuncs(panic_fns, 1);
     }
     l.pop(1);
     _ = l.getMetatableRegistry("seamstress");
     l.setMetatable(-2);
-    l.pushFunction(ziglua.wrap(clearRegistry));
+    l.pushFunction(zlua.wrap(clearRegistry));
     lu.addExitHandler(l, .stop);
     return 1;
 }
@@ -88,7 +88,7 @@ fn addPackageSearcher(lua: *Lua) !void {
     // package.searchers[#package.searchers + 1] = f
     _ = try lua.getGlobal("package");
     _ = lua.getField(-1, "searchers");
-    lua.pushFunction(ziglua.wrap(struct {
+    lua.pushFunction(zlua.wrap(struct {
         fn searcher(l: *Lua) i32 { // where this is f
             const name = l.checkString(1);
             if (modules.list.get(name)) |func| {
@@ -114,7 +114,7 @@ pub fn main(l: *Lua, run_args: RunArgs) !void {
     l.openLibs();
     run_args.push(l);
     // we want a zig stack trace
-    _ = l.atPanic(ziglua.wrap(struct {
+    _ = l.atPanic(zlua.wrap(struct {
         fn panic(lua: *Lua) i32 { // function panic(error_msg)
             const error_msg = lua.toStringEx(-1);
             // add a lua stack trace
@@ -317,7 +317,7 @@ fn run(l: *Lua) i32 {
         lu.checkCallable(l, 2);
         lu.load(l, "seamstress.async.Promise");
         l.insert(2);
-        l.call(t - 1, 0);
+        l.call(.{ .args = t - 1, .results = 0 });
         if (seamstress.status == .suspended) {
             defer seamstress.status = .suspended;
             seamstress.status = .running;
@@ -358,8 +358,8 @@ fn clearRegistry(l: *Lua) i32 {
     const tbl = l.getTop();
     l.pushNil();
     const key = l.getTop();
-    var index: ziglua.Integer = 1;
-    while (l.next(ziglua.registry_index)) {
+    var index: zlua.Integer = 1;
+    while (l.next(zlua.registry_index)) {
         defer l.setTop(key);
         switch (l.typeOf(-1)) {
             .userdata, .table => {
@@ -377,13 +377,13 @@ fn clearRegistry(l: *Lua) i32 {
         _ = l.getIndex(tbl, index);
         _ = l.getMetaField(-1, "__cancel") catch {};
         l.rotate(-2, 1);
-        l.call(1, 0);
+        l.call(.{ .args = 1, .results = 0 });
     }
     return 0;
 }
 
 pub fn panicCleanup(l: *Lua) void {
-    @setCold(true);
+    @branchHint(.cold);
     lu.load(l, "seamstress");
     _ = l.getField(-1, "panic");
     l.rotate(-2, 1);
@@ -395,8 +395,8 @@ pub fn panicCleanup(l: *Lua) void {
 pub const version = @import("assets").version;
 
 const xev = @import("xev");
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const std = @import("std");
 const lu = @import("lua_util.zig");
 const modules = @import("modules.zig");
@@ -408,7 +408,7 @@ test "ref" {
 
 test "lifecycle" {
     std.testing.log_level = .debug;
-    const l = try Lua.init(&std.testing.allocator);
+    const l = try Lua.init(std.testing.allocator);
     defer l.deinit();
     l.openLibs();
     lu.load(l, "seamstress");
