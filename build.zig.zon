@@ -13,9 +13,8 @@
             .hash = "libxev-0.0.0-86vtc-zkEgB7uv1i0Sa6ytJETZQi_lHJrImu9mLb9moi",
         },
         .zosc = .{
-            //.url = "git+https://github.com/robbielyman/zosc?ref=v1.1.0#ef8caf3c9f86b09b7fbed9fe6d4cdba3a43fb9de",
-            //.hash = "zosc-0.1.0-AAAAAMNlAQB8EI-CE0C8NRQRev0kus5li8OtBrecUdFE",
-            .path = "../zosc",
+            .url = "git+https://github.com/robbielyman/zosc?ref=main#574938ce59505e57df1ed7b22d505e84a4c6f051",
+            .hash = "zosc-0.1.0-Y0MRGIJmAQAp85zMQYfekmcK-CPy2U1bNAN3H0-gH3XS",
         },
         .embed_file = .{
             .url = "git+https://github.com/robbielyman/EmbedFile.zig?ref=main#67d95b1a7db29bf80fe7db5daeb3878b1002f3e9",
