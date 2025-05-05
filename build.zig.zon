@@ -5,8 +5,8 @@
     .paths = .{ "build.zig.zon", "build.zig", "src", "lua" },
     .dependencies = .{
         .zlua = .{
-            .url = "git+https://github.com/natecraddock/ziglua?ref=main#dfa5b912efe4eaf17e3ae8317b2966ddaa457de6",
-            .hash = "zlua-0.1.0-hGRpC7QOBQBY97K-rliWJXOgrVvFmY9hPTQ5fOsvqDKa",
+            .url = "git+https://github.com/natecraddock/ziglua#f7b3c90d026afd33b0a70debfd54ea50f1acfc1b",
+            .hash = "zlua-0.1.0-hGRpC-IZBQDD9MfKTbeRE3z_Qg-kI2SqnT1JaRl9W9Sq",
         },
         .libxev = .{
             .url = "git+https://github.com/mitchellh/libxev?ref=main#94ed6af7b2aaaeab987fbf87fcee410063df715b",
