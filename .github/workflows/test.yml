@@ -11,7 +11,8 @@ jobs:
       - uses: mlugg/setup-zig@v1
         with:
           version: master
-      - uses: leafo/gh-actions-lua@v10
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: leafo/gh-actions-lua@v11
         with:
           luaVersion: "5.4.7"
       - uses: luarocks/gh-actions-luarocks@v5
