@@ -58,7 +58,7 @@ fn setAbrtHandler() !void {
                 }
             }.handleAbrt,
         },
-        .mask = if (builtin.os.tag == .linux) std.posix.empty_sigset else 0,
+        .mask = if (builtin.os.tag == .linux) std.posix.sigemptyset() else 0,
         .flags = 0,
     };
     std.posix.sigaction(std.posix.SIG.ABRT, &act, null);
