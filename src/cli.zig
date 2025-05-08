@@ -19,11 +19,11 @@ pub fn register(l: *Lua) i32 {
         } };
     blk: {
         l.newMetatable("seamstress.cli") catch break :blk;
-        const funcs: []const ziglua.FnReg = &.{
-            .{ .name = "__gc", .func = ziglua.wrap(__gc) },
-            .{ .name = "__index", .func = ziglua.wrap(__index) },
-            .{ .name = "__newindex", .func = ziglua.wrap(__newindex) },
-            .{ .name = "__cancel", .func = ziglua.wrap(__cancel) },
+        const funcs: []const zlua.FnReg = &.{
+            .{ .name = "__gc", .func = zlua.wrap(__gc) },
+            .{ .name = "__index", .func = zlua.wrap(__index) },
+            .{ .name = "__newindex", .func = zlua.wrap(__newindex) },
+            .{ .name = "__cancel", .func = zlua.wrap(__cancel) },
         };
         l.setFuncs(funcs, 0);
     }
@@ -41,7 +41,7 @@ fn setup(lua: *Lua) !void {
     try self.buffer.ensureUnusedCapacity(lua.allocator(), max_input_len);
     const seamstress = lu.getSeamstress(lua);
     lua.pushValue(-1); // ref pops
-    const h = try lua.ref(ziglua.registry_index);
+    const h = try lua.ref(zlua.registry_index);
     if (!builtin.is_test) try std.io.getStdOut().writeAll("> ");
     self.stdin.read(&seamstress.loop, &self.c, .{
         .slice = self.buffer.unusedCapacitySlice(),
@@ -77,13 +77,13 @@ fn stdinCallback(
 ) xev.CallbackAction {
     const l = lu.getLua(loop);
     const handle = lu.handleFromPtr(ptr);
-    _ = l.rawGetIndex(ziglua.registry_index, handle);
+    _ = l.rawGetIndex(zlua.registry_index, handle);
     const cli = l.toUserdata(Cli, -1) catch unreachable;
 
     const length = r catch |err| {
         const str = @errorName(err);
         l.pop(1);
-        l.unref(ziglua.registry_index, handle);
+        l.unref(zlua.registry_index, handle);
         cli.running = false;
         if (err != error.Canceled and err != error.EOF)
             logger.err("error reading from stdin! {s}", .{str});
@@ -101,7 +101,7 @@ fn stdinCallback(
 
     cli.stdinCallback2(l, loop, c, ptr) catch {
         lu.reportError(l);
-        l.unref(ziglua.registry_index, handle);
+        l.unref(zlua.registry_index, handle);
         cli.running = false;
     };
     l.pop(1);
@@ -111,7 +111,7 @@ fn stdinCallback(
 fn stdinCallback2(cli: *Cli, l: *Lua, loop: *xev.Loop, c: *xev.Completion, ptr: ?*anyopaque) !void {
     if (std.mem.eql(u8, "quit\n", cli.buffer.items)) return {
         const handle = lu.handleFromPtr(ptr);
-        l.unref(ziglua.registry_index, handle);
+        l.unref(zlua.registry_index, handle);
         cli.running = false;
         lu.load(l, "seamstress");
         _ = l.getField(-1, "stop");
@@ -154,9 +154,9 @@ fn stdinCallback2(cli: *Cli, l: *Lua, loop: *xev.Loop, c: *xev.Completion, ptr: 
     // complete; let's call it
     l.pushInteger(lu.handleFromPtr(ptr)); // stack is now: cli repl_func handle
     l.pushValue(-1);
-    l.pushClosure(ziglua.wrap(resumeRepl(.success)), 1);
+    l.pushClosure(zlua.wrap(resumeRepl(.success)), 1);
     l.pushValue(-2);
-    l.pushClosure(ziglua.wrap(resumeRepl(.failure)), 1);
+    l.pushClosure(zlua.wrap(resumeRepl(.failure)), 1);
     l.remove(-3);
     try lu.waitForLuaCall(l, .{ .function_with_num_args = 0 });
     l.pop(1); // pop the promise
@@ -167,12 +167,12 @@ fn resumeRepl(comptime which: enum { success, failure }) fn (*Lua) i32 {
         fn f(l: *Lua) i32 {
             const idx = Lua.upvalueIndex(1);
             const handle = l.toInteger(idx) catch unreachable;
-            _ = l.getIndex(ziglua.registry_index, handle); // use the handle
+            _ = l.getIndex(zlua.registry_index, handle); // use the handle
             const cli = l.toUserdata(Cli, -1) catch unreachable;
             l.pop(1); // pop the cli
             switch (which) {
                 .success => resumeRepl2(l) catch |err| {
-                    l.unref(ziglua.registry_index, @intCast(handle));
+                    l.unref(zlua.registry_index, @intCast(handle));
                     logger.err("unable to write to stdout! {s}", .{@errorName(err)});
                     return 0;
                 },
@@ -236,7 +236,7 @@ fn __cancel(l: *Lua) i32 {
     self.running = false;
     const seamstress = lu.getSeamstress(l);
     l.pushValue(1);
-    const handle = l.ref(ziglua.registry_index) catch l.raiseErrorStr("unable to register CLI!", .{});
+    const handle = l.ref(zlua.registry_index) catch l.raiseErrorStr("unable to register CLI!", .{});
     self.c_c = .{
         .op = .{ .cancel = .{ .c = &self.c } },
         .userdata = lu.ptrFromHandle(handle),
@@ -273,9 +273,9 @@ fn __newindex(l: *Lua) i32 {
             setup(l) catch l.raiseErrorStr("unable to start CLI!", .{});
         } else if (cli.running and !running) {
             cli.running = false;
-            l.pushFunction(ziglua.wrap(__cancel));
+            l.pushFunction(zlua.wrap(__cancel));
             l.pushValue(1);
-            l.call(1, 0);
+            l.call(.{ .args = 1 });
         }
         return 0;
     }
@@ -288,7 +288,7 @@ const std = @import("std");
 const Seamstress = @import("seamstress.zig");
 const xev = @import("xev");
 const lu = @import("lua_util.zig");
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const Stdin = @import("cli/stdin.zig");
 const builtin = @import("builtin");

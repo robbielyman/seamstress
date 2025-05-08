@@ -250,7 +250,7 @@ Here is an example from =cli.zig=:
   // l is the seamstress Lua environment.
   // self is a pointer to the CLI struct
   l.pushLightUserdata(self);
-  l.pushClosure(ziglua.wrap(struct {
+  l.pushClosure(zlua.wrap(struct {
       fn f(l: *Lua) i32 {
           const i = Lua.upvalueIndex(1);
           const cli = l.toUserdata(Cli, i) catch unreachable;

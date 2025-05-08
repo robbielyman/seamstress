@@ -27,7 +27,7 @@ pub fn register(comptime which: enum { monome, grid, arc }) fn (*Lua) i32 {
                         return 1;
                     }
                 }.f;
-                l.pushClosure(ziglua.wrap(realLoader), 2);
+                l.pushClosure(zlua.wrap(realLoader), 2);
                 return 1;
             }
         }.f,
@@ -124,7 +124,7 @@ fn @"/serialosc/device"(l: *Lua, from: std.net.Address, path: []const u8, id: []
     }
     lu.preparePublish(l, if (is_arc) &.{ "monome", "arc", "add" } else &.{ "monome", "grid", "add" });
     l.rotate(-3, -1); // publish, namespace, device
-    l.call(2, 0); // publish(namespace, device)
+    l.call(.{ .args = 2 }); // publish(namespace, device)
     return .no;
 }
 
@@ -152,7 +152,7 @@ fn @"/serialosc/remove"(l: *Lua, from: std.net.Address, _: []const u8, id: []con
     lu.preparePublish(l, if (is_arc) &.{ "monome", "arc", "remove" } else &.{ "monome", "grid", "remove" });
     _ = l.pushString(id);
     l.pushInteger(port);
-    l.call(3, 0);
+    l.call(.{ .args = 3 });
     return .no;
 }
 
@@ -169,8 +169,8 @@ fn @"/serialosc/notify"(l: *Lua, to: std.net.Address) void {
     };
 }
 
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const osc = @import("osc.zig");
 const lu = @import("lua_util.zig");
 const z = osc.z;

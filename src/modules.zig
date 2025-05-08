@@ -1,22 +1,22 @@
 /// the master list of all seamstress modules
 /// pub so that the loader function defined in seamstress.zig can access it
-pub const list = std.StaticStringMap(*const fn (?*ziglua.LuaState) callconv(.C) i32).initComptime(.{
-    .{ "seamstress", ziglua.wrap(@import("seamstress.zig").register) },
-    .{ "seamstress.event", ziglua.wrap(openFn("event.lua")) },
-    .{ "seamstress.async", ziglua.wrap(@import("async.zig").register(.@"async")) },
-    .{ "seamstress.async.Promise", ziglua.wrap(@import("async.zig").register(.promise)) },
-    .{ "seamstress.test", ziglua.wrap(openFn("test.lua")) },
-    .{ "seamstress.Timer", ziglua.wrap(@import("timer.zig").register) },
-    .{ "seamstress.osc", ziglua.wrap(@import("osc.zig").register(.osc)) },
-    .{ "seamstress.osc.Client", ziglua.wrap(@import("osc.zig").register(.client)) },
-    .{ "seamstress.osc.Server", ziglua.wrap(@import("osc.zig").register(.server)) },
-    .{ "seamstress.osc.Message", ziglua.wrap(@import("osc.zig").register(.message)) },
-    .{ "seamstress.monome", ziglua.wrap(@import("monome.zig").register(.monome)) },
-    .{ "seamstress.monome.Grid", ziglua.wrap(@import("monome.zig").register(.grid)) },
-    .{ "seamstress.monome.Arc", ziglua.wrap(@import("monome.zig").register(.arc)) },
-    .{ "seamstress.repl", ziglua.wrap(@import("repl.zig").register) },
-    .{ "seamstress.cli", ziglua.wrap(@import("cli.zig").register) },
-    .{ "seamstress.builtin_test_files", ziglua.wrap(builtinTestFiles) },
+pub const list = std.StaticStringMap(*const fn (?*zlua.LuaState) callconv(.C) i32).initComptime(.{
+    .{ "seamstress", zlua.wrap(@import("seamstress.zig").register) },
+    .{ "seamstress.event", zlua.wrap(openFn("event.lua")) },
+    .{ "seamstress.async", zlua.wrap(@import("async.zig").register(.@"async")) },
+    .{ "seamstress.async.Promise", zlua.wrap(@import("async.zig").register(.promise)) },
+    .{ "seamstress.test", zlua.wrap(openFn("test.lua")) },
+    .{ "seamstress.Timer", zlua.wrap(@import("timer.zig").register) },
+    .{ "seamstress.osc", zlua.wrap(@import("osc.zig").register(.osc)) },
+    .{ "seamstress.osc.Client", zlua.wrap(@import("osc.zig").register(.client)) },
+    .{ "seamstress.osc.Server", zlua.wrap(@import("osc.zig").register(.server)) },
+    .{ "seamstress.osc.Message", zlua.wrap(@import("osc.zig").register(.message)) },
+    .{ "seamstress.monome", zlua.wrap(@import("monome.zig").register(.monome)) },
+    .{ "seamstress.monome.Grid", zlua.wrap(@import("monome.zig").register(.grid)) },
+    .{ "seamstress.monome.Arc", zlua.wrap(@import("monome.zig").register(.arc)) },
+    .{ "seamstress.repl", zlua.wrap(@import("repl.zig").register) },
+    .{ "seamstress.cli", zlua.wrap(@import("cli.zig").register) },
+    .{ "seamstress.builtin_test_files", zlua.wrap(builtinTestFiles) },
 });
 
 fn openFn(comptime filename: []const u8) fn (*Lua) i32 {
@@ -55,7 +55,7 @@ fn loadComptime(l: *Lua, comptime module_name: [:0]const u8) void {
 fn builtinTestFiles(l: *Lua) i32 {
     const decls = comptime std.meta.declarations(assets.@"test");
     l.createTable(decls.len, 0);
-    var idx: ziglua.Integer = 1;
+    var idx: zlua.Integer = 1;
     inline for (decls) |decl| {
         _ = l.pushAny(.{
             .filename = decl.name,
@@ -71,6 +71,6 @@ const assets = @import("assets");
 
 const std = @import("std");
 const builtin = @import("builtin");
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const lu = @import("lua_util.zig");

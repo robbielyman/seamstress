@@ -1,5 +1,5 @@
 const std = @import("std");
-const e = @import("embed-file");
+const e = @import("embed_file");
 
 const Dep = struct {
     name: []const u8,
@@ -37,7 +37,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .link_libc = true,
     });
-    for (deps) |dep| dep.addImport(&lib.root_module);
+    for (deps) |dep| dep.addImport(lib.root_module);
     const lib_install = b.addInstallFileWithDir(
         lib.getEmittedBin(),
         .lib,
@@ -53,7 +53,7 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
-    for (deps) |dep| dep.addImport(&exe.root_module);
+    for (deps) |dep| dep.addImport(exe.root_module);
     b.installArtifact(exe);
 
     const tests = b.addTest(.{
@@ -61,7 +61,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .root_source_file = b.path("src/main.zig"),
     });
-    for (deps) |dep| dep.addImport(&tests.root_module);
+    for (deps) |dep| dep.addImport(tests.root_module);
     const tests_run = b.addRunArtifact(tests);
 
     const tests_step = b.step("test", "test seamstress");
@@ -86,8 +86,8 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
     for (deps) |dep| {
-        dep.addImport(&root_comp_check.root_module);
-        dep.addImport(&comp_check.root_module);
+        dep.addImport(root_comp_check.root_module);
+        dep.addImport(comp_check.root_module);
     }
     const check = b.step("check", "check for compile errors");
     check.dependOn(&comp_check.step);
@@ -125,7 +125,7 @@ pub fn build(b: *std.Build) !void {
             .target = t,
             .optimize = release_mode,
         });
-        for (target_deps) |dep| dep.addImport(&release_exe.root_module);
+        for (target_deps) |dep| dep.addImport(release_exe.root_module);
 
         const target_output = b.addInstallArtifact(release_exe, .{
             .dest_dir = .{ .override = .{
@@ -140,16 +140,16 @@ pub fn build(b: *std.Build) !void {
 }
 
 fn createImports(b: *std.Build, options: Options) []const Dep {
-    var list: std.ArrayListUnmanaged(Dep) = .{};
+    var list: std.ArrayListUnmanaged(Dep) = .empty;
     list.ensureTotalCapacity(b.allocator, 5) catch @panic("OOM");
 
     const assets = b.createModule(.{
-        .root_source_file = b.addWriteFile("module.zig",
+        .root_source_file = b.addWriteFiles().add("module.zig",
             \\pub const lua = @import("lua");
             \\pub const @"test" = @import("test");
             \\pub const version = @import("version").version;
             \\
-        ).files.items[0].getPath(),
+        ),
     });
     {
         const lua_files: []const []const u8 = &.{
@@ -174,7 +174,7 @@ fn createImports(b: *std.Build, options: Options) []const Dep {
     {
         const ef = e.addEmbedFiles(b);
         ef.addFile(b.path("version.txt"), "semver-str", null);
-        const wf_module = b.addWriteFile("version.zig",
+        const wf_module = b.addWriteFiles().add("version.zig",
             \\const semver_str = str: {
             \\    const str = @import("semver-str").@"semver-str";
             \\    if (std.mem.indexOfAny(u8, &str, "\r\n \t")) |idx| break :str str[0..idx];
@@ -187,13 +187,13 @@ fn createImports(b: *std.Build, options: Options) []const Dep {
             \\    @compileLog("error: ", err);
             \\    @compileError("semantic version string failed to parse!");
             \\};
-        ).files.items[0].getPath();
+        );
         const version = b.createModule(.{ .root_source_file = wf_module });
         version.addImport("semver-str", ef.module);
         assets.addImport("version", version);
     }
 
-    const ziglua = b.dependency("ziglua", .{
+    const zlua = b.dependency("zlua", .{
         .target = options.target,
         .optimize = options.optimize,
     });
@@ -205,11 +205,11 @@ fn createImports(b: *std.Build, options: Options) []const Dep {
         .target = options.target,
         .optimize = options.optimize,
     });
-    const @"known-folders" = b.dependency("known-folders", .{});
-    list.appendAssumeCapacity(.{ .module = ziglua.module("ziglua"), .name = "ziglua" });
+    const known_folders = b.dependency("known_folders", .{});
+    list.appendAssumeCapacity(.{ .module = zlua.module("zlua"), .name = "zlua" });
     list.appendAssumeCapacity(.{ .module = xev.module("xev"), .name = "xev" });
     list.appendAssumeCapacity(.{ .module = zosc.module("zosc"), .name = "zosc" });
-    list.appendAssumeCapacity(.{ .module = @"known-folders".module("known-folders"), .name = "known-folders" });
+    list.appendAssumeCapacity(.{ .module = known_folders.module("known-folders"), .name = "known-folders" });
     list.appendAssumeCapacity(.{ .module = assets, .name = "assets" });
     return list.items;
 }

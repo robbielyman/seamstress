@@ -1,24 +1,24 @@
 pub fn register(l: *Lua) i32 {
     blk: {
         l.newMetatable("seamstress.monome.Arc") catch break :blk;
-        const funcs: []const ziglua.FnReg = &.{
-            .{ .name = "__index", .func = ziglua.wrap(common.__index(.arc)) },
-            .{ .name = "__newindex", .func = ziglua.wrap(common.__newindex(.arc)) },
-            .{ .name = "__gc", .func = ziglua.wrap(common.__gc(.arc)) },
-            .{ .name = "refresh", .func = ziglua.wrap(refresh) },
-            .{ .name = "led", .func = ziglua.wrap(led) },
-            .{ .name = "all", .func = ziglua.wrap(all) },
-            .{ .name = "connect", .func = ziglua.wrap(common.connect(.arc)) },
-            .{ .name = "info", .func = ziglua.wrap(common.@"/sys/info") },
+        const funcs: []const zlua.FnReg = &.{
+            .{ .name = "__index", .func = zlua.wrap(common.__index(.arc)) },
+            .{ .name = "__newindex", .func = zlua.wrap(common.__newindex(.arc)) },
+            .{ .name = "__gc", .func = zlua.wrap(common.__gc(.arc)) },
+            .{ .name = "refresh", .func = zlua.wrap(refresh) },
+            .{ .name = "led", .func = zlua.wrap(led) },
+            .{ .name = "all", .func = zlua.wrap(all) },
+            .{ .name = "connect", .func = zlua.wrap(common.connect(.arc)) },
+            .{ .name = "info", .func = zlua.wrap(common.@"/sys/info") },
         };
         l.setFuncs(funcs, 0);
     }
     l.pop(1);
     l.newTable();
     l.newTable();
-    const funcs: []const ziglua.FnReg = &.{
-        .{ .name = "__call", .func = ziglua.wrap(__call) },
-        .{ .name = "connect", .func = ziglua.wrap(connect) },
+    const funcs: []const zlua.FnReg = &.{
+        .{ .name = "__call", .func = zlua.wrap(__call) },
+        .{ .name = "connect", .func = zlua.wrap(connect) },
     };
     l.setFuncs(funcs, 0);
     _ = l.pushStringZ("__index");
@@ -66,7 +66,7 @@ fn connect(l: *Lua) i32 {
     // g:connect()
     _ = l.getMetaField(-1, "connect") catch unreachable;
     l.pushValue(-2);
-    l.call(1, 0);
+    l.call(.{ .args = 1 });
     return 1; // return g
 }
 
@@ -120,7 +120,7 @@ fn all(l: *Lua) i32 {
     const arc = l.checkUserdata(Arc, 1, "seamstress.monome.Arc");
     const level = common.checkIntegerAcceptingNumber(l, 2);
     l.argCheck(0 <= level and level <= 15, 2, "level must be between 0 and 15!");
-    var i: ziglua.Integer = 1;
+    var i: zlua.Integer = 1;
     blk: {
         if ((l.getUserValue(1, 2) catch unreachable) == .nil) break :blk;
         while (i <= 4) : (i += 1) {
@@ -149,7 +149,7 @@ pub const Decls = struct {
         if (!lu.isCallable(l, -1)) return .yes;
         l.pushInteger(n + 1);
         l.pushInteger(d);
-        l.call(2, 0);
+        l.call(.{ .args = 2 });
         return .no;
     }
 
@@ -159,7 +159,7 @@ pub const Decls = struct {
         if (!lu.isCallable(l, -1)) return .yes;
         l.pushInteger(n + 1);
         l.pushInteger(z);
-        l.call(2, 0);
+        l.call(.{ .args = 2 });
         return .no;
     }
 };
@@ -172,8 +172,8 @@ pub const DeclsTypes = std.StaticStringMap([]const u8).initComptime(.{
     .{ "//enc/key", "ii" },
 });
 
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const osc = @import("../osc.zig");
 const lu = @import("../lua_util.zig");
 const common = @import("common.zig");

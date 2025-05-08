@@ -1,14 +1,14 @@
 pub fn register(l: *Lua) i32 {
     blk: {
         l.newMetatable("seamstress.osc.Message") catch break :blk; // new metatable
-        const funcs: []const ziglua.FnReg = &.{
-            .{ .name = "__index", .func = ziglua.wrap(__index) },
-            .{ .name = "__newindex", .func = ziglua.wrap(__newindex) },
-            .{ .name = "__gc", .func = ziglua.wrap(__gc) },
-            .{ .name = "bytes", .func = ziglua.wrap(bytes) },
-            .{ .name = "__eq", .func = ziglua.wrap(__eq) },
-            .{ .name = "__ipairs", .func = ziglua.wrap(__ipairs) },
-            .{ .name = "__len", .func = ziglua.wrap(__len) },
+        const funcs: []const zlua.FnReg = &.{
+            .{ .name = "__index", .func = zlua.wrap(__index) },
+            .{ .name = "__newindex", .func = zlua.wrap(__newindex) },
+            .{ .name = "__gc", .func = zlua.wrap(__gc) },
+            .{ .name = "bytes", .func = zlua.wrap(bytes) },
+            .{ .name = "__eq", .func = zlua.wrap(__eq) },
+            .{ .name = "__ipairs", .func = zlua.wrap(__ipairs) },
+            .{ .name = "__len", .func = zlua.wrap(__len) },
         };
         l.setFuncs(funcs, 0);
         // _ = l.pushString("seamstress.osc.Message");
@@ -16,7 +16,7 @@ pub fn register(l: *Lua) i32 {
         // l.setTable(-3);
     }
     l.pop(1);
-    l.pushFunction(ziglua.wrap(new));
+    l.pushFunction(zlua.wrap(new));
     return 1;
 }
 
@@ -29,7 +29,7 @@ fn __index(l: *Lua) i32 {
         return 1;
     }
     if (l.compare(2, -1, .eq)) { // k == "types"
-        var buf: ziglua.Buffer = undefined;
+        var buf: zlua.Buffer = undefined;
         _ = buf.initSize(l, builder.data.items.len);
         for (builder.data.items) |data|
             buf.addChar(@tagName(data)[0]);
@@ -47,7 +47,7 @@ fn __index(l: *Lua) i32 {
         else => l.argError(2, "integer expected"),
     }
     const idx = l.toInteger(2) catch unreachable;
-    if (idx <= 0 or idx > std.math.cast(ziglua.Integer, builder.data.items.len) orelse 0)
+    if (idx <= 0 or idx > std.math.cast(zlua.Integer, builder.data.items.len) orelse 0)
         return 0; // nothing at that index!
     osc.pushData(l, builder.data.items[@intCast(idx - 1)]); // push the data
     return 1;
@@ -140,7 +140,7 @@ fn __ipairs(l: *Lua) i32 {
         }
     }.f;
     // return iterator, msg, 1
-    l.pushFunction(ziglua.wrap(iteratorFn));
+    l.pushFunction(zlua.wrap(iteratorFn));
     l.pushValue(1);
     l.pushInteger(1);
     return 3;
@@ -181,7 +181,7 @@ fn new(l: *Lua) i32 {
         const types: ?[]const u8 = if (l.getField(1, "types") == .string) l.toString(-1) catch unreachable else null;
         l.pop(1);
         if (types) |string| {
-            var idx: ziglua.Integer = 1; // traverse the array part of the table
+            var idx: zlua.Integer = 1; // traverse the array part of the table
             for (string) |tag| { // using the typetag as the source of truth
                 _ = l.getIndex(1, idx);
                 defer l.pop(1);
@@ -199,7 +199,7 @@ fn new(l: *Lua) i32 {
             l.len(1); // get the length
             const len = l.toInteger(-1) catch unreachable;
             l.pop(1);
-            var idx: ziglua.Integer = 1; // traverse the array part of the table
+            var idx: zlua.Integer = 1; // traverse the array part of the table
             while (idx <= len) : (idx += 1) {
                 _ = l.getIndex(1, idx);
                 defer l.pop(1);
@@ -229,6 +229,6 @@ fn pullIn(l: *Lua, builder: *z.Message.Builder, tag: ?u8) !void {
 const z = @import("zosc");
 const osc = @import("../osc.zig");
 const std = @import("std");
-const ziglua = @import("ziglua");
-const Lua = ziglua.Lua;
+const zlua = @import("zlua");
+const Lua = zlua.Lua;
 const lu = @import("../lua_util.zig");

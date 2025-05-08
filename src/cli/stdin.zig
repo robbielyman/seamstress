@@ -20,6 +20,7 @@ const S = xev.stream.Stream(xev, @This(), .{
     .write = .none,
     .close = false,
     .threadpool = false,
+    .poll = true,
 });
 
 pub const ReadError = S.ReadError;

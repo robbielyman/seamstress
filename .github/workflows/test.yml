@@ -10,8 +10,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: mlugg/setup-zig@v1
         with:
-          version: 0.13.0
-      - uses: leafo/gh-actions-lua@v10
+          version: master
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: leafo/gh-actions-lua@v11
         with:
           luaVersion: "5.4.7"
       - uses: luarocks/gh-actions-luarocks@v5
@@ -29,5 +30,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: mlugg/setup-zig@v1
         with:
-          version: 0.13.0
+          version: master
       - run: zig fmt --check .

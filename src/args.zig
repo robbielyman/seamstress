@@ -1,10 +1,10 @@
 const Args = @This();
 
-logging: logging.Args,
+log: logging.Args,
 run: Seamstress.RunArgs,
 
 pub fn format(args: Args, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-    try writer.print("log file: {s}, log level: {s}\n", .{ args.logging.path orelse "default", switch (args.logging.level) {
+    try writer.print("log file: {s}, log level: {s}\n", .{ args.log.path orelse "default", switch (args.log.level) {
         .err => "error",
         .warn => "warning",
         .info => "info",
@@ -67,7 +67,7 @@ pub fn process(cli_args: []const []const u8) Args {
         file = arg;
     }
     return .{
-        .logging = logging_arg,
+        .log = logging_arg,
         .run = .{
             .file = file,
             .tests = .{

@@ -110,7 +110,7 @@ var log_level: std.log.Level = switch (builtin.mode) {
 
 pub fn logFn(
     comptime level: std.log.Level,
-    comptime scope: @Type(.EnumLiteral),
+    comptime scope: @Type(.enum_literal),
     comptime fmt: []const u8,
     args: anytype,
 ) void {
